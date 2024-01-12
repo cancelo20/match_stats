@@ -5,6 +5,7 @@ from .responses import TeamResponse, TeamStats
 
 
 class LeagueMatchesUpdate:
+    # Обновляет список игр актуального тура
     def matchday_update(self, league_name):
         matches = LeagueMatches.objects.filter(name=league_name)
         matches.delete()
@@ -25,6 +26,7 @@ class LeagueMatchesUpdate:
 
 
 class LeagueUpdate:
+    # Обновляет номер актуального тура и дату его завершения
     def matchday_update(self, league_code):
 
         league = League.objects.get(league_code=league_code)
@@ -55,6 +57,7 @@ class LeagueUpdate:
 
 
 class TeamUpdate:
+    # Обновляет статистику команд
     def team_results_update(self, league_name):
             stat_list = list()
 

@@ -5,6 +5,7 @@ class MatchProbability:
         self.team1_name = self.home_team.get('name')
         self.team2_name = self.away_team.get('name')
 
+    # Возвращает процент исхода каждого события
     def win_probability(self):
         NUMBER_OF_MATCHES = 20
 
@@ -17,6 +18,7 @@ class MatchProbability:
 
         return team1_win_probability, team2_win_probability, draw_probability
 
+    #Возвращает среднее количество голов за 10 матчей
     def score_average(self):
         NUMBER_OF_MATCHES = 10
 
@@ -28,6 +30,7 @@ class MatchProbability:
 
         return team1_average, team2_average
 
+    # Возвращает строку с текстом расчетов
     def print_result(self):
         win_probability = self.win_probability()
         score_average = self.score_average()

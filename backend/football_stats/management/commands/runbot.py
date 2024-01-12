@@ -36,6 +36,7 @@ class Command(BaseCommand):
             bot.polling()
 
 
+# Обработка команды /start
 @bot.message_handler(commands=['start'])
 def start(message):
     name = message.from_user.first_name
@@ -49,6 +50,7 @@ def start(message):
         message.chat.id, text)
 
 
+# Обработка команд /matchday и /teams
 @bot.message_handler(commands=['matchday', 'teams'])
 def matchday_team_cmd(message):
     button = telebot.types.InlineKeyboardMarkup(row_width=1)
@@ -114,7 +116,7 @@ def teams(callback):
         reply_markup=button
     )
 
-
+# Выдает текст результатов
 def get_result_text(stats):
     return (
         f'{stats.get("name")}:\n' + f'побед: {stats.get("wins")}\n' + f'ничьих: {stats.get("draws")}\n' +
@@ -127,6 +129,7 @@ def get_result_text(stats):
     )
 
 
+# Выдает результаты одной команды
 def get_team_result(team):
     team_stats_db = Statistics.objects.get(name=team)
     team_stats_dict = model_to_dict(team_stats_db)
@@ -134,7 +137,7 @@ def get_team_result(team):
 
     return team_stats_text
 
-# Выдает результат команды
+# Выдает результат команд, запрашиваемого матча
 def get_result(teams):
     home_team, away_team = teams.split(' - ')
     home_team_stats_db = Statistics.objects.get(name=home_team)
@@ -190,6 +193,7 @@ def say_result(callback):
             pass
 
 
+# Логика работы кнопок
 @bot.callback_query_handler(func=lambda c:True)
 def callback_inline(callback):
     data = callback.data.split(' & ')
