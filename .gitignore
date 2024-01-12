@@ -153,6 +153,7 @@ dmypy.json
 cython_debug/
 
 # my files
-test.py
+commands/test.py
 __pycache__/
-migrations/__init__.py
+migrations/*
+!__init__.py
