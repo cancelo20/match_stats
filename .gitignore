@@ -154,7 +154,3 @@ cython_debug/
 
 # my files
 __pycache__/
-
-**/**/migrations/**
-!**/**/migrations
-!**/**/migrations/__init__.py
