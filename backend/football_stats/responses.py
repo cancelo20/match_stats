@@ -5,7 +5,7 @@ from time import sleep
 from dotenv import load_dotenv
 from datetime import date
 
-from .models import Team, Statistics
+from .models import Team
 
 
 load_dotenv()
@@ -13,23 +13,12 @@ load_dotenv()
 
 class TeamResponse:
     def __init__(self, team_id=None, league_code=None):
-        self.limit = 10
         self.team_id = team_id
         self.league_code = league_code
 
         self.HEADERS = {
             'X-Auth-Token': str(os.getenv('API_TOKEN'))
         }
-
-    #Возвращает разницу, нехватающую для статистики из 10 матчей
-    def match_played_check(self):
-        try:
-            team = Team.objects.get(url_id=self.team_id)
-        except:
-            print('matched_played_check(): неудалось найти команду')
-            return 0
-        else:
-            return 10 - team.matches_played
 
     # Выдает список команд в заданной лиге
     def get_teams_response(self):
@@ -62,10 +51,8 @@ class TeamResponse:
         if team_id == None:
             team_id = self.team_id
 
-        limit = self.limit + self.match_played_check() # type: ignore
-        limit = self.limit
         current_data = date.today()
-        url = f'{os.getenv("TEAMS_URL")}/{team_id}/matches?dateFrom=2023-07-01&dateTo={current_data}&limit={limit}'
+        url = f'{os.getenv("TEAMS_URL")}/{team_id}/matches?dateFrom=2023-07-01&dateTo={current_data}&limit=20'
         response = requests.get(url=url, headers=self.HEADERS).json()
 
         print(
@@ -119,17 +106,24 @@ class TeamStats:
 
         response = TeamResponse(self.team_id).get_team_matches_response()
         shortname = Team.objects.get(url_id=self.team_id).shortname
-        matches = response.get('matches')
+        matches = response.get('matches')[::-1]
         home_away_team = None
         team = self.team_data
 
+        matches_count = 0
         for match in matches:
+            if matches_count == 10:
+                break
+
             home_away_team = 'home' if match.get('homeTeam').get('tla') == shortname else 'away'
             results = match.get('score')
 
             try:
-                results.get('winner').startswith(home_away_team.upper())
+                result = results.get('winner').startswith(home_away_team.upper())
             except:
+                continue
+
+            if result == 'null':
                 continue
 
             if results.get('winner').startswith(home_away_team.upper()):
@@ -148,6 +142,7 @@ class TeamStats:
                 team[f'{home_away_team}_form'] += RED_EMOJI
                 team[f'{home_away_team}_loses'] += 1
 
+            matches_count +=1
             team['goals'] += results.get('fullTime').get(home_away_team)
 
         return team

@@ -10,7 +10,5 @@ class Command(BaseCommand):
     help = "test bot"
 
     def handle(self, *args, **options):
-        leagues = League.objects.all()
 
-        for league in leagues:
-            TeamUpdate().team_results_update(league.name)
+        TeamUpdate().team_results_update(league_name='Premier League')

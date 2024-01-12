@@ -64,9 +64,6 @@ class TeamUpdate:
             league = League.objects.get(name=league_name)
             teams = Team.objects.filter(league=league)
 
-            POINTS_FOR_WIN = 3
-            POINTS_FOR_DRAW = 1
-
             for team in teams:
                 stats = TeamStats(team.url_id).matches_results()
                 for stat in stats:
@@ -75,9 +72,8 @@ class TeamUpdate:
                 (wins, draws, loses, home_wins,
                 home_loses, home_draws, away_wins, away_loses,
                 away_draws, form, home_form, away_form, goals) = stat_list
-                points = wins * POINTS_FOR_WIN + draws * POINTS_FOR_DRAW
 
-                print(stat_list, ' - ', points)
+                print(team.name, wins+draws+loses, stat_list)
 
                 statistic = Statistics.objects.get(name=team.name)
                 statistic.wins = wins

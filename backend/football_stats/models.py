@@ -69,14 +69,6 @@ class Team(models.Model):
         on_delete=models.CASCADE,
         verbose_name='Лига',
     )
-    matches_played = models.IntegerField(
-        verbose_name='Матчей сыграно',
-        default=0,
-        validators=[
-            MinValueValidator(1),
-            MaxValueValidator(50)
-        ]
-    )
     stats_last_10 = models.ForeignKey(
         'Statistics',
         on_delete=models.CASCADE,
