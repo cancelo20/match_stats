@@ -76,6 +76,25 @@ class TeamResponse:
 
         return matchday_response
 
+    # Выдает количество очков команды, общее количество побед, ничьх, поражений
+    def team_points(self):
+        url = f'{os.getenv("LEAGUES_URL")}/{self.league_code}/standings/'
+        response = requests.get(url, headers=self.HEADERS).json()
+        table = response.get('standings')[0].get('table')
+
+        team_list = list()
+
+        for team in table:
+            team_dict = dict()
+            team_dict['name'] = team.get('team').get('shortName')
+            team_dict['wins'] = int(team.get('won'))
+            team_dict['draws'] = int(team.get('draw'))
+            team_dict['loses'] = int(team.get('lost'))
+            team_dict['points'] = int(team.get('points'))
+
+            team_list.append(team_dict)
+
+        return team_list
 
 class TeamStats:
     def __init__(self, team_id, league_code=None):

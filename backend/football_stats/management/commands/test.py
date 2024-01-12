@@ -1,7 +1,9 @@
 from django.core.management import BaseCommand
 
-from football_stats.updates import TeamUpdate
+from football_stats.updates import TeamUpdate, LeagueMatchesUpdate
 from football_stats.models import League
+
+import datetime as dt
 
 class Command(BaseCommand):
     def __init__(self, *args, **kwargs):
@@ -10,5 +12,8 @@ class Command(BaseCommand):
     help = "test bot"
 
     def handle(self, *args, **options):
+        pass
+        leagues = League.objects.all()
 
-        TeamUpdate().team_results_update(league_name='Premier League')
+        for league in leagues:
+            LeagueMatchesUpdate().matchday_update(league_name=league.name)

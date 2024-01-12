@@ -7,7 +7,8 @@ from django.forms.models import model_to_dict
 from dotenv import load_dotenv
 
 from football_stats.probability import MatchProbability
-from football_stats.updates import LeagueUpdate, TeamUpdate
+from football_stats.updates import (
+    LeagueUpdate, LeagueMatchesUpdate, TeamUpdate)
 from football_stats.models import (
     League, LeagueMatches, Statistics, Team)
 
@@ -49,6 +50,10 @@ def start(message):
     bot.send_message(
         message.chat.id, text)
 
+@bot.message_handler(commands=['scorers'])
+def scorers(message):
+    pass
+
 
 # Обработка команд /matchday и /teams
 @bot.message_handler(commands=['matchday', 'teams'])
@@ -79,8 +84,8 @@ def matchday(callback):
     button = telebot.types.InlineKeyboardMarkup(row_width=1)
 
     for f_match in matches:
-        text = f_match.current_match
-        data = f'{text} & {league_name}'
+        text = f'{f_match.current_match}  {f_match.date} МСК'
+        data = f'{f_match.current_match} & {league_name}'
 
         button.add(
             telebot.types.InlineKeyboardButton(text, callback_data=data)
@@ -102,12 +107,16 @@ def teams(callback):
 
     button = telebot.types.InlineKeyboardMarkup(row_width=1)
 
+    count = 1
     for team in teams:
-        text = team.name
+        text = (
+            f'{count}. {team.name} - {team.points} О  {team.total_wins} В  ' +
+            f'{team.total_draws} Н  {team.total_loses} П')
 
         button.add(
-            telebot.types.InlineKeyboardButton(text, callback_data=text)
+            telebot.types.InlineKeyboardButton(text, callback_data=team.name)
         )
+        count += 1
 
     bot.edit_message_text(
         chat_id=callback.message.chat.id,
@@ -119,12 +128,13 @@ def teams(callback):
 # Выдает текст результатов
 def get_result_text(stats):
     return (
+        f'Статистика за последние 10 матчей:\n\n'
         f'{stats.get("name")}:\n' + f'побед: {stats.get("wins")}\n' + f'ничьих: {stats.get("draws")}\n' +
         f'поражений: {stats.get("loses")}\n' + f'побед дома: {stats.get("home_wins")}\n' +
         f'поражений дома: {stats.get("home_loses")}\n' + f'ничьих дома: {stats.get("home_draws")}\n' +
         f'побед вгостях: {stats.get("away_wins")}\n' + f'поражений вгостях: {stats.get("away_loses")}\n' +
         f'ничьих вгостях: {stats.get("away_draws")}\n' +
-        f'всего голов: {stats.get("goals")}\n\n' + f'форма: {stats.get("form")}\n\n' +
+        f'голов: {stats.get("goals")}\n\n' + f'форма: {stats.get("form")}\n\n' +
         f'форма дома: {stats.get("home_form")}\n\n' + f'форма вгостях: {stats.get("away_form")}'
     )
 
@@ -207,11 +217,15 @@ def callback_inline(callback):
             league = League.objects.get(name=data[0])
             matchday_end = str(league.matchday_end_date)
             if str(date.today()) > matchday_end:
+                LeagueMatchesUpdate().matchday_update(league.name)
                 LeagueUpdate().matchday_update(league.league_code)
                 TeamUpdate().team_results_update(league.name)
             matchday(callback)
         elif command == '/teams':
+            league = League.objects.get(name=data[0])
+            matchday_end = str(league.matchday_end_date)
+            if str(date.today()) > matchday_end:
+                TeamUpdate().team_points_update(league.name)
             teams(callback)
-
         else:
             say_result(callback)

@@ -1,3 +1,5 @@
+import datetime as dt
+
 from time import sleep
 
 from .models import League, LeagueMatches, Team, Statistics
@@ -16,36 +18,50 @@ class LeagueMatchesUpdate:
             league_code=league_code).get_matchday_response()
 
         for match in current_matches.get('matches'):
+            date_time = match.get('utcDate').split('T')
+            time = date_time[1].split(':')
+            date = date_time[0].split('-')
+
+            hours = int(time[0])
+            minutes = int(time[1])
+            day = int(date[2])
+            month = int(date[1])
+            year = int(date[0])
+
+            match_time = self.get_moscow_date(year, month, day, hours, minutes)
+
             home_team = match.get('homeTeam').get('shortName')
             away_team = match.get('awayTeam').get('shortName')
 
             LeagueMatches.objects.create(
                 name=league_name,
-                current_match=f'{home_team} - {away_team}'
+                current_match=(
+                    f'{home_team} - {away_team}'),
+                date=match_time
             )
+
+    def get_moscow_date(self, year, month, day, hours, minutes):
+        MOSCOW_PERIOD = dt.timedelta(hours=3)
+
+        current_moscow_date = str(dt.datetime(
+            year, month, day, hours, minutes
+            ) + MOSCOW_PERIOD).split(' ')
+        print(current_moscow_date)
+
+        date = current_moscow_date[0].split('-')
+        time = current_moscow_date[1].split(':')
+
+        return f'{date[2]}.{date[1]} {time[0]}:{time[1]}'
+
 
 
 class LeagueUpdate:
     # Обновляет номер актуального тура и дату его завершения
     def matchday_update(self, league_code):
-
         league = League.objects.get(league_code=league_code)
         matchday_response = TeamResponse(
             league_code=league_code).get_matchday_response()
         current_matchday = matchday_response.get('filters').get('matchday')
-
-        matches = matchday_response.get('matches')
-
-        LeagueMatches.objects.filter(name=league.name).delete()
-
-        for match in matches:
-            home_team = match.get('homeTeam').get('shortName')
-            away_team = match.get('awayTeam').get('shortName')
-
-            LeagueMatches.objects.create(
-                name=league.name,
-                current_match=f'{home_team} - {away_team}'
-            )
 
         league.current_matchday = int(current_matchday)
         league.save()
@@ -93,3 +109,18 @@ class TeamUpdate:
 
                 stat_list = list()
                 sleep(6.1)
+
+    def team_points_update(self, league_name):
+        league = League.objects.get(name=league_name)
+        teams_points = TeamResponse(
+            league_code=league.league_code).team_points()
+
+        for team_point in teams_points:
+            print(team_point)
+            team = Team.objects.get(name=team_point.get('name'))
+
+            team.total_wins = team_point.get('wins')
+            team.total_draws = team_point.get('draws')
+            team.total_loses = team_point.get('loses')
+            team.points = team_point.get('points')
+            team.save()

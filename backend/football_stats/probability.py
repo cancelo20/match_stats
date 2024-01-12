@@ -1,3 +1,6 @@
+from .models import LeagueMatches
+
+
 class MatchProbability:
     def __init__(self, home_team, away_team):
         self.home_team = home_team
@@ -34,9 +37,13 @@ class MatchProbability:
     def print_result(self):
         win_probability = self.win_probability()
         score_average = self.score_average()
+        date = LeagueMatches.objects.get(
+            current_match=f'{self.team1_name} - {self.team2_name}'
+        ).date
 
         return (
             f'{self.__str__()}\n\n' +
+            f'{date} МСК\n\n'
             'Вероятность исхода:\n' +
             f'   Победа {self.team1_name}: {win_probability[0]}%\n' +
             f'   Ничья: {win_probability[2]}%\n' +

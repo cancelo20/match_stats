@@ -46,6 +46,11 @@ class LeagueMatches(models.Model):
         max_length = 100,
         verbose_name = 'Актуальный матч'
     )
+    date = models.CharField(
+        max_length = 100,
+        verbose_name = 'Дата матча (МСК)',
+        blank=True
+    )
 
     class Meta:
         ordering = ['name']
@@ -76,9 +81,41 @@ class Team(models.Model):
         blank=True,
         null=True
     )
+    total_wins = models.IntegerField(
+        verbose_name='Общее кол-во побед',
+        default=0,
+        validators=[
+            MinValueValidator(1),
+            MaxValueValidator(50)
+        ]
+    )
+    total_loses = models.IntegerField(
+        verbose_name='Общее кол-во поражений',
+        default=0,
+        validators=[
+            MinValueValidator(1),
+            MaxValueValidator(50)
+        ]
+    )
+    total_draws = models.IntegerField(
+        verbose_name='Общее кол-во ничьих',
+        default=0,
+        validators=[
+            MinValueValidator(1),
+            MaxValueValidator(50)
+        ]
+    )
+    points = models.IntegerField(
+        verbose_name='Кол-во очков',
+        default=0,
+        validators=[
+            MinValueValidator(1),
+            MaxValueValidator(200)
+        ]
+    )
 
     class Meta:
-        ordering = ['league__name', 'name']
+        ordering = ['league__name', '-points']
         verbose_name = 'Команда'
         verbose_name_plural = 'Команды'
 
