@@ -153,4 +153,6 @@ dmypy.json
 cython_debug/
 
 # my files
-backend/football_stats/management/commands/test.py
+/backend/football_stats/management/commands/test.py
+/backend/football_stats/__pycache__
+/backend/football_stats/migrations
