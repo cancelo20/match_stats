@@ -71,18 +71,19 @@ class LeagueMatchesUpdate:
         for match in matches:
             if match.get('homeTeam').get('shortName') != home_team:
                 continue
+            if match.get('status') == 'FINISHED':
+                fulltime = match.get('score').get('fullTime')
+                home_goals = fulltime.get('home')
+                away_goals = fulltime.get('away')
 
-            fulltime = match.get('score').get('fullTime')
-            home_goals = fulltime.get('home')
-            away_goals = fulltime.get('away')
+                league_match = LeagueMatches.objects.filter(
+                    current_match__istartswith=home_team)[0]
+                league_match.fulltime = f'{home_goals}-{away_goals}'
+                league_match.finished = True
+                league_match.save()
 
             break
 
-        league_match = LeagueMatches.objects.filter(
-            current_match__istartswith=home_team)[0]
-        league_match.fulltime = f'{home_goals}-{away_goals}'
-        league_match.finished = True
-        league_match.save()
 
 
 

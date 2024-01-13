@@ -48,7 +48,7 @@ class MatchProbability:
             f'   Победа {self.team1_name}: {win_probability[0]}%\n' +
             f'   Ничья: {win_probability[2]}%\n' +
             f'   Победа {self.team2_name}: {win_probability[1]}%\n\n' +
-            'Средннее количество голов:\n' +
+            'Среднее количество голов:\n' +
             f'   {self.team1_name}: {score_average[0]}\n' +
             f'   {self.team2_name}: {score_average[1]}\n'
         )

@@ -1,6 +1,13 @@
 import os
 import telebot
 
+from socket import gaierror
+from requests.exceptions import ConnectionError
+from urllib3.exceptions import (
+    MaxRetryError, NameResolutionError)
+
+from threading import Thread
+
 from django.core.management import BaseCommand
 from django.forms.models import model_to_dict
 
@@ -32,12 +39,30 @@ class Command(BaseCommand):
     help = "Start football bot"
 
     def handle(self, *args, **options):
-            print(
-                'Бот начал свою работу.\n' +
-                'id в Телеграме: @EPLStatsBot (https://t.me/EPLStatsBot)\n' +
-                '_______________________________________________________'
-            )
-            bot.polling()
+        def run():
+            while True:
+                try:
+                    print(
+                        'Бот начал свою работу.\n' +
+                        'id в Телеграме: @EPLStatsBot (https://t.me/EPLStatsBot)\n' +
+                        '_______________________________________________________'
+                    )
+                    bot.infinity_polling()
+                except ConnectionError as ce:
+                    print(type(ce))
+                    continue
+                except MaxRetryError as mre:
+                    print(type(mre))
+                    continue
+                except NameResolutionError as nre:
+                    print(type(nre))
+                    continue
+                except gaierror as ge:
+                    print(type(ge))
+                    continue
+
+        Thread(target=run, daemon=True).start()
+        input('Press <Enter> to exit.')
 
 
 # Обработка команды /start
@@ -87,14 +112,14 @@ def matchday(callback):
         text = f'{f_match.current_match}  '
         data = f'{f_match.current_match} & {league_name}'
         date_text = f'{f_match.date} МСК'
-        fulltime = ''
         home_team = f_match.current_match.split(' - ')[0]
 
         day, month = date_text.split(' ')[0].split('.')
         hours, minutes = date_text.split(' ')[1].split(':')
+        year = datetime.utcnow().year
 
         if datetime.utcnow() > datetime(
-                2024, int(month), int(day), int(hours)-1, int(minutes)):
+                int(year), int(month), int(day), int(hours)-1, int(minutes)):
             if f_match.finished is True:
                 text += f_match.fulltime
             else:
@@ -102,6 +127,9 @@ def matchday(callback):
                 text += LeagueMatches.objects.filter(
                     current_match__istartswith=home_team
                 )[0].fulltime
+        elif datetime.utcnow() == datetime(
+                int(year), int(month), int(day), int(hours)-3, int(minutes)):
+            text += 'IN LIVE'
         else:
             text += date_text
 
@@ -162,8 +190,9 @@ def scorers(callback):
             f'{player.name} - {player.goals}({player.penalty}) Г  ' +
             f'{player.assists} П\n\n')
 
-    bot.send_message(
+    bot.edit_message_text(
         chat_id=callback.message.chat.id,
+        message_id=callback.message.id,
         text=text,
     )
 
@@ -227,8 +256,11 @@ def say_result(callback):
                 'Что-то пошло не так, попробуйте позже.')
             print('say_result(): get_result() не выдал результат КОМАНДЫ')
         else:
-            bot.send_message(
-                callback.message.chat.id, text)
+            bot.edit_message_text(
+                chat_id=callback.message.chat.id,
+                message_id=callback.message.id,
+                text=text
+            )
             pass
 
     else:
@@ -240,8 +272,11 @@ def say_result(callback):
                 'Что-то пошло не так, попробуйте позже.')
             print('say_result(): get_result() не выдал результат 2-х КОМАНД')
         else:
-            bot.send_message(
-                callback.message.chat.id, text)
+            bot.edit_message_text(
+                chat_id=callback.message.chat.id,
+                message_id=callback.message.id,
+                text=text
+            )
             pass
 
 
