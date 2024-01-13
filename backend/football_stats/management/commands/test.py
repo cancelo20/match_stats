@@ -1,7 +1,9 @@
 from django.core.management import BaseCommand
 
+from football_stats.responses import PlayerResponse
 from football_stats.updates import TeamUpdate, LeagueMatchesUpdate
 from football_stats.models import League
+from football_stats.updates import PlayerUpdate
 
 import datetime as dt
 
@@ -13,7 +15,4 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         pass
-        leagues = League.objects.all()
-
-        for league in leagues:
-            LeagueMatchesUpdate().matchday_update(league_name=league.name)
+        LeagueMatchesUpdate().fulltime_update(league_name='Premier League', home_team='Burnley')

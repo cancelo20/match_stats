@@ -11,12 +11,17 @@ from .models import Team
 load_dotenv()
 
 
+HEADERS = {
+    'X-Auth-Token': str(os.getenv('API_TOKEN'))
+}
+
+
 class TeamResponse:
     def __init__(self, team_id=None, league_code=None):
         self.team_id = team_id
         self.league_code = league_code
 
-        self.HEADERS = {
+        HEADERS = {
             'X-Auth-Token': str(os.getenv('API_TOKEN'))
         }
 
@@ -25,7 +30,7 @@ class TeamResponse:
         url = f'{os.getenv("LEAGUES_URL")}/{self.league_code}/teams/'
         teams_list = list()
         try:
-            response = requests.get(url=url, headers=self.HEADERS).json()
+            response = requests.get(url=url, headers=HEADERS).json()
             teams = response.get('teams')
         except:
             assert False, 'get_team(): ошибка в response.'
@@ -53,7 +58,7 @@ class TeamResponse:
 
         current_data = date.today()
         url = f'{os.getenv("TEAMS_URL")}/{team_id}/matches?dateFrom=2023-07-01&dateTo={current_data}&limit=20'
-        response = requests.get(url=url, headers=self.HEADERS).json()
+        response = requests.get(url=url, headers=HEADERS).json()
 
         print(
             response.get('message')
@@ -64,11 +69,11 @@ class TeamResponse:
     # Выдает response матчей актуального игрового дня
     def get_matchday_response(self):
         league_url = f'{os.getenv("LEAGUES_URL")}/{self.league_code}/'
-        league_response = requests.get(league_url, headers=self.HEADERS).json()
+        league_response = requests.get(league_url, headers=HEADERS).json()
         current_matchday = league_response.get('currentSeason').get('currentMatchday')
 
         matchday_url = league_url + f'matches?matchday={current_matchday}'
-        matchday_response = requests.get(url=matchday_url, headers=self.HEADERS).json()
+        matchday_response = requests.get(url=matchday_url, headers=HEADERS).json()
 
         print(
             league_response.get('message')
@@ -79,7 +84,7 @@ class TeamResponse:
     # Выдает количество очков команды, общее количество побед, ничьх, поражений
     def team_points(self):
         url = f'{os.getenv("LEAGUES_URL")}/{self.league_code}/standings/'
-        response = requests.get(url, headers=self.HEADERS).json()
+        response = requests.get(url, headers=HEADERS).json()
         table = response.get('standings')[0].get('table')
 
         team_list = list()
@@ -165,3 +170,15 @@ class TeamStats:
             team['goals'] += results.get('fullTime').get(home_away_team)
 
         return team
+
+
+class PlayerResponse:
+    def __init__(self, league_code):
+        self.league_code = league_code
+
+    def get_top_scorers_league(self):
+        url = f'{os.getenv("LEAGUES_URL")}/{self.league_code}/scorers/'
+        response = requests.get(url=url, headers=HEADERS).json()
+        scorers = response.get('scorers')
+
+        return scorers

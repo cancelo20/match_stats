@@ -51,9 +51,22 @@ class LeagueMatches(models.Model):
         verbose_name = 'Дата матча (МСК)',
         blank=True
     )
+    fulltime = models.CharField(
+        max_length = 100,
+        verbose_name = 'Счет матча',
+        blank=True
+    )
+    finished = models.BooleanField(
+        default=False
+    )
 
     class Meta:
         ordering = ['name']
+        verbose_name = 'Матч лиги'
+        verbose_name_plural = 'Матчи лиги'
+
+    def __str__(self):
+        return self.current_match
 
 
 class Team(models.Model):
@@ -118,6 +131,53 @@ class Team(models.Model):
         ordering = ['league__name', '-points']
         verbose_name = 'Команда'
         verbose_name_plural = 'Команды'
+
+    def __str__(self):
+        return self.name
+
+
+class Player(models.Model):
+    name = models.CharField(
+        max_length=200,
+        verbose_name='Имя'
+    )
+    league = models.CharField(
+        max_length=200,
+        verbose_name='Лига'
+    )
+    team = models.CharField(
+        max_length=200,
+        verbose_name='Команда'
+    )
+    goals = models.IntegerField(
+        verbose_name='Кол-во голов',
+        default=0,
+        validators=[
+            MinValueValidator(1),
+            MaxValueValidator(200)
+        ]
+    )
+    penalty = models.IntegerField(
+        verbose_name='Кол-во голов с пенальти',
+        default=0,
+        validators=[
+            MinValueValidator(1),
+            MaxValueValidator(200)
+        ]
+    )
+    assists = models.IntegerField(
+        verbose_name='Кол-во гол. передач',
+        default=0,
+        validators=[
+            MinValueValidator(1),
+            MaxValueValidator(200)
+        ]
+    )
+
+    class Meta:
+        ordering = ['league', '-goals']
+        verbose_name = 'Игрок'
+        verbose_name_plural = 'Игроки'
 
     def __str__(self):
         return self.name

@@ -8,11 +8,14 @@ from dotenv import load_dotenv
 
 from football_stats.probability import MatchProbability
 from football_stats.updates import (
-    LeagueUpdate, LeagueMatchesUpdate, TeamUpdate)
+    LeagueUpdate, LeagueMatchesUpdate,
+    TeamUpdate, PlayerUpdate
+)
 from football_stats.models import (
-    League, LeagueMatches, Statistics, Team)
+    League, LeagueMatches, Statistics, Team, Player
+)
 
-from datetime import date
+from datetime import datetime
 
 
 load_dotenv()
@@ -43,21 +46,18 @@ def start(message):
     name = message.from_user.first_name
     text = (
         f'Привет, {name}, я готов работать!\n\n' +
-        '/teams - список команд\n' +
-        '/matchday - предстоящий тур'
+        '/teams - таблица лиги\n' +
+        '/matchday - предстоящий тур\n' +
+        '/scorers - список бомбардиров лиги'
     )
 
     bot.send_message(
         message.chat.id, text)
 
-@bot.message_handler(commands=['scorers'])
-def scorers(message):
-    pass
-
 
 # Обработка команд /matchday и /teams
-@bot.message_handler(commands=['matchday', 'teams'])
-def matchday_team_cmd(message):
+@bot.message_handler(commands=['matchday', 'teams', 'scorers'])
+def league_choosing_cmd(message):
     button = telebot.types.InlineKeyboardMarkup(row_width=1)
     command = message.text
 
@@ -84,8 +84,27 @@ def matchday(callback):
     button = telebot.types.InlineKeyboardMarkup(row_width=1)
 
     for f_match in matches:
-        text = f'{f_match.current_match}  {f_match.date} МСК'
+        text = f'{f_match.current_match}  '
         data = f'{f_match.current_match} & {league_name}'
+        date_text = f'{f_match.date} МСК'
+        fulltime = ''
+        home_team = f_match.current_match.split(' - ')[0]
+
+        day, month = date_text.split(' ')[0].split('.')
+        hours, minutes = date_text.split(' ')[1].split(':')
+
+        if datetime.utcnow() > datetime(
+                2024, int(month), int(day), int(hours)-1, int(minutes)):
+            if f_match.finished is True:
+                text += f_match.fulltime
+            else:
+                LeagueMatchesUpdate().fulltime_update(league_name, home_team)
+                text += LeagueMatches.objects.filter(
+                    current_match__istartswith=home_team
+                )[0].fulltime
+        else:
+            text += date_text
+
 
         button.add(
             telebot.types.InlineKeyboardButton(text, callback_data=data)
@@ -104,6 +123,9 @@ def teams(callback):
     league_name = callback.data.split(' & ')[0]
     league = League.objects.get(name=league_name)
     teams = Team.objects.filter(league=league)
+    msg = (
+        f'Команды {league.name}\n' +
+        'О - очки, В-победы, Н - ничьи, П - поражения')
 
     button = telebot.types.InlineKeyboardMarkup(row_width=1)
 
@@ -121,8 +143,28 @@ def teams(callback):
     bot.edit_message_text(
         chat_id=callback.message.chat.id,
         message_id=callback.message.id,
-        text=f'Команды {league.name}',
+        text=msg,
         reply_markup=button
+    )
+
+
+# Выдает список бомбардиров лиги
+def scorers(callback):
+    league_name = callback.data.split(' & ')[0]
+    players = Player.objects.filter(league=league_name)
+    text = (
+        f'Бомбардиры {league_name}\n\n' +
+        f'Г - голы(с пенальти), П - гол. пасы\n' +
+        '_' * 15 + '\n\n')
+
+    for player in players:
+        text += (
+            f'{player.name} - {player.goals}({player.penalty}) Г  ' +
+            f'{player.assists} П\n\n')
+
+    bot.send_message(
+        chat_id=callback.message.chat.id,
+        text=text,
     )
 
 # Выдает текст результатов
@@ -216,7 +258,7 @@ def callback_inline(callback):
         if command == '/matchday':
             league = League.objects.get(name=data[0])
             matchday_end = str(league.matchday_end_date)
-            if str(date.today()) > matchday_end:
+            if str(datetime.utcnow()) > matchday_end:
                 LeagueMatchesUpdate().matchday_update(league.name)
                 LeagueUpdate().matchday_update(league.league_code)
                 TeamUpdate().team_results_update(league.name)
@@ -224,8 +266,14 @@ def callback_inline(callback):
         elif command == '/teams':
             league = League.objects.get(name=data[0])
             matchday_end = str(league.matchday_end_date)
-            if str(date.today()) > matchday_end:
+            if str(datetime.utcnow()) > matchday_end:
                 TeamUpdate().team_points_update(league.name)
             teams(callback)
+        elif command == '/scorers':
+            league = League.objects.get(name=data[0])
+            matchday_end = str(league.matchday_end_date)
+            if str(datetime.utcnow()) > matchday_end:
+                PlayerUpdate(league.league_code).players_update()
+            scorers(callback)
         else:
             say_result(callback)

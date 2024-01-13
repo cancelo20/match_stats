@@ -2,11 +2,14 @@ import datetime as dt
 
 from time import sleep
 
-from .models import League, LeagueMatches, Team, Statistics
-from .responses import TeamResponse, TeamStats
+from .models import (
+    League, LeagueMatches, Team, Statistics, Player)
+from .responses import TeamResponse, TeamStats, PlayerResponse
 
 
 class LeagueMatchesUpdate:
+    def __init__(self):
+        ...
     # Обновляет список игр актуального тура
     def matchday_update(self, league_name):
         matches = LeagueMatches.objects.filter(name=league_name)
@@ -40,6 +43,7 @@ class LeagueMatchesUpdate:
                 date=match_time
             )
 
+    # Переводит времся с UTC-0 к Московскому
     def get_moscow_date(self, year, month, day, hours, minutes):
         MOSCOW_PERIOD = dt.timedelta(hours=3)
 
@@ -52,6 +56,33 @@ class LeagueMatchesUpdate:
         time = current_moscow_date[1].split(':')
 
         return f'{date[2]}.{date[1]} {time[0]}:{time[1]}'
+
+    # Выдает счет сыгранного матча
+    def fulltime_update(self, league_name, home_team):
+        league = League.objects.get(name=league_name)
+
+        matches = TeamResponse(
+            league_code=league.league_code).get_matchday_response(
+            ).get('matches')
+
+        home_goals = 0
+        away_goals = 0
+
+        for match in matches:
+            if match.get('homeTeam').get('shortName') != home_team:
+                continue
+
+            fulltime = match.get('score').get('fullTime')
+            home_goals = fulltime.get('home')
+            away_goals = fulltime.get('away')
+
+            break
+
+        league_match = LeagueMatches.objects.filter(
+            current_match__istartswith=home_team)[0]
+        league_match.fulltime = f'{home_goals}-{away_goals}'
+        league_match.finished = True
+        league_match.save()
 
 
 
@@ -110,6 +141,7 @@ class TeamUpdate:
                 stat_list = list()
                 sleep(6.1)
 
+    # Обновляет общее кол-во очков, побед, поражений, ничьиъ команды
     def team_points_update(self, league_name):
         league = League.objects.get(name=league_name)
         teams_points = TeamResponse(
@@ -124,3 +156,37 @@ class TeamUpdate:
             team.total_loses = team_point.get('loses')
             team.points = team_point.get('points')
             team.save()
+
+
+class PlayerUpdate:
+    def __init__(self, league_code):
+        self.league_code = league_code
+
+    # Обновляет список бомбордиров лиги
+    def players_update(self):
+        scorers = PlayerResponse(self.league_code).get_top_scorers_league()
+        league = League.objects.get(league_code=self.league_code)
+
+        Player.objects.filter(league=league.name).delete()
+
+        for scorer in scorers:
+            name = scorer.get('player').get('name')
+            player_league = league.name
+            team = scorer.get('team').get('shortName')
+            goals = scorer.get('goals')
+            penalty = scorer.get('penalties')
+            assists = scorer.get('assists')
+
+            if goals is None:
+                goals = 0
+            if penalty is None:
+                penalty = 0
+            if assists is None:
+                assists = 0
+
+            print(name, goals, penalty, assists)
+
+            Player.objects.create(
+                name=name, league=player_league, team=team,
+                goals=goals, penalty=penalty, assists=assists
+            )
