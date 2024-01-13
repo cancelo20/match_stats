@@ -1,6 +1,8 @@
 import os
 import telebot
 
+from datetime import datetime, timedelta
+
 from socket import gaierror
 from requests.exceptions import ConnectionError
 from urllib3.exceptions import (
@@ -21,8 +23,6 @@ from football_stats.updates import (
 from football_stats.models import (
     League, LeagueMatches, Statistics, Team, Player
 )
-
-from datetime import datetime
 
 
 load_dotenv()
@@ -59,6 +59,9 @@ class Command(BaseCommand):
                     continue
                 except gaierror as ge:
                     print(type(ge))
+                    continue
+                except Exception as error:
+                    print(error)
                     continue
 
         Thread(target=run, daemon=True).start()
@@ -104,6 +107,8 @@ def league_choosing_cmd(message):
 # Выдает матчи актуального matchday
 def matchday(callback):
     league_name = callback.data.split(' & ')[0]
+
+    league = League.objects.get(name=league_name)
     matches = LeagueMatches.objects.filter(name=league_name)
 
     button = telebot.types.InlineKeyboardMarkup(row_width=1)
@@ -117,9 +122,22 @@ def matchday(callback):
         day, month = date_text.split(' ')[0].split('.')
         hours, minutes = date_text.split(' ')[1].split(':')
         year = datetime.utcnow().year
+        datetime_utc_end = datetime(
+                int(year),
+                int(month),
+                int(day),
+                int(hours),
+                int(minutes)
+        ) - timedelta(hours=1, minutes=30)
+        datetime_utc_start = datetime(
+                int(year),
+                int(month),
+                int(day),
+                int(hours),
+                int(minutes)
+        ) - timedelta(hours=3)
 
-        if datetime.utcnow() > datetime(
-                int(year), int(month), int(day), int(hours)-1, int(minutes)):
+        if datetime.utcnow() > datetime_utc_end:
             if f_match.finished is True:
                 text += f_match.fulltime
             else:
@@ -127,8 +145,9 @@ def matchday(callback):
                 text += LeagueMatches.objects.filter(
                     current_match__istartswith=home_team
                 )[0].fulltime
-        elif datetime.utcnow() == datetime(
-                int(year), int(month), int(day), int(hours)-3, int(minutes)):
+                PlayerUpdate(league.league_code).players_update()
+        elif datetime.utcnow() >= datetime_utc_start and (
+                datetime.utcnow() <= datetime_utc_end):
             text += 'IN LIVE'
         else:
             text += date_text
@@ -183,12 +202,16 @@ def scorers(callback):
     text = (
         f'Бомбардиры {league_name}\n\n' +
         f'Г - голы(с пенальти), П - гол. пасы\n' +
-        '_' * 15 + '\n\n')
+         '___________________________________\n\n')
 
     for player in players:
+        team = player.team
+        shortname_team = Team.objects.get(
+            name=team).shortname
         text += (
-            f'{player.name} - {player.goals}({player.penalty}) Г  ' +
-            f'{player.assists} П\n\n')
+            f'{player.name} ({shortname_team}) ' +
+            f'- {player.goals}({player.penalty})Г ' +
+            f'{player.assists}П\n\n')
 
     bot.edit_message_text(
         chat_id=callback.message.chat.id,
@@ -199,7 +222,6 @@ def scorers(callback):
 # Выдает текст результатов
 def get_result_text(stats):
     return (
-        f'Статистика за последние 10 матчей:\n\n'
         f'{stats.get("name")}:\n' + f'побед: {stats.get("wins")}\n' + f'ничьих: {stats.get("draws")}\n' +
         f'поражений: {stats.get("loses")}\n' + f'побед дома: {stats.get("home_wins")}\n' +
         f'поражений дома: {stats.get("home_loses")}\n' + f'ничьих дома: {stats.get("home_draws")}\n' +
@@ -305,10 +327,6 @@ def callback_inline(callback):
                 TeamUpdate().team_points_update(league.name)
             teams(callback)
         elif command == '/scorers':
-            league = League.objects.get(name=data[0])
-            matchday_end = str(league.matchday_end_date)
-            if str(datetime.utcnow()) > matchday_end:
-                PlayerUpdate(league.league_code).players_update()
             scorers(callback)
         else:
             say_result(callback)
