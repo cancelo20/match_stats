@@ -1,6 +1,5 @@
 from pytz import UTC
 from datetime import datetime as dt
-from time import sleep
 
 from .models import *
 from .responses import (
