@@ -1,3 +1,6 @@
+from datetime import datetime as dt
+from pytz import UTC
+
 from django.core.validators import (
     MinValueValidator, MaxValueValidator)
 from django.db import models
@@ -21,12 +24,14 @@ class League(models.Model):
             MaxValueValidator(40)
         ]
     )
-    matchday_end_date = models.CharField(
-        max_length=15,
-        verbose_name='Дата окончания тура',
-        blank=True
+    start_date = models.DateTimeField(
+        default=dt(1, 1, 1, 0, 0, 0, tzinfo=UTC),
+        verbose_name = 'Дата и время начала тура'
     )
-
+    end_date = models.DateTimeField(
+        default=dt(1, 1, 1, 0, 0, 0, tzinfo=UTC),
+        verbose_name = 'Дата и время окончания тура'
+    )
 
     class Meta:
         ordering = ['id']
@@ -46,22 +51,22 @@ class LeagueMatches(models.Model):
         max_length = 100,
         verbose_name = 'Актуальный матч'
     )
-    date = models.CharField(
-        max_length = 100,
-        verbose_name = 'Дата матча (МСК)',
-        blank=True
-    )
     fulltime = models.CharField(
         max_length = 100,
         verbose_name = 'Счет матча',
         blank=True
     )
+    date = models.DateTimeField(
+        default=dt(1, 1, 1, 0, 0, 0, tzinfo=UTC),
+        verbose_name = 'Дата и время матча'
+    )
     finished = models.BooleanField(
-        default=False
+        default=False,
+        verbose_name = 'Проверка на завершенность матча'
     )
 
     class Meta:
-        ordering = ['name']
+        ordering = ['name', 'date']
         verbose_name = 'Матч лиги'
         verbose_name_plural = 'Матчи лиги'
 
@@ -82,17 +87,9 @@ class Team(models.Model):
         max_length=5,
         verbose_name='Аббревиатура команды'
     )
-    league = models.ForeignKey(
-        League,
-        on_delete=models.CASCADE,
+    league = models.CharField(
+        max_length=100,
         verbose_name='Лига',
-    )
-    stats_last_10 = models.ForeignKey(
-        'Statistics',
-        on_delete=models.CASCADE,
-        verbose_name='Статистика команды',
-        blank=True,
-        null=True
     )
     total_wins = models.IntegerField(
         verbose_name='Общее кол-во побед',
@@ -128,7 +125,7 @@ class Team(models.Model):
     )
 
     class Meta:
-        ordering = ['league__name', '-points']
+        ordering = ['league', '-points']
         verbose_name = 'Команда'
         verbose_name_plural = 'Команды'
 
@@ -275,8 +272,12 @@ class Statistics(models.Model):
         blank=True,
         verbose_name = 'Гостевая форма команды'
     )
-    goals = models.PositiveSmallIntegerField(
-        verbose_name='Голы',
+    goals_scored = models.PositiveSmallIntegerField(
+        verbose_name='Забитые голы',
+        default=0
+    )
+    goals_conceded = models.PositiveSmallIntegerField(
+        verbose_name='Пропущенные голы',
         default=0
     )
 
@@ -286,3 +287,17 @@ class Statistics(models.Model):
 
     def __str__(self):
         return self.name
+
+class Requests(models.Model):
+    count = models.IntegerField(
+        verbose_name='количество запросов',
+        default=0,
+        validators=[
+            MinValueValidator(0),
+            MaxValueValidator(10)
+        ]
+    )
+    last_update_date = models.DateTimeField(
+        verbose_name = 'Дата и время начала тура',
+        auto_now=True
+    )
