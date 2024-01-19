@@ -43,7 +43,7 @@ class Checks:
             print('Тур был не создан')
         else:
             # обновить список
-            if dt.now().replace(tzinfo=UTC) > last_match_date + td(days=1):
+            if dt.utcnow().replace(tzinfo=UTC) > last_match_date + td(days=1):
                 update = AfterMatchdayUpdate(league_name=self.league_name)
                 update.matchday_update_all()
                 print('Тур обновлен')
@@ -54,7 +54,7 @@ class Checks:
 
     def is_matches_finished(self) -> None:
         print(self.is_matches_finished.__name__)
-        now = dt.now().replace(tzinfo=UTC)
+        now = dt.utcnow().replace(tzinfo=UTC)
 
         not_finished_matches = LeagueMatches.objects.filter(name=self.league_name)
         matches_list = list()

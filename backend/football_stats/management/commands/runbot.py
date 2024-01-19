@@ -81,9 +81,7 @@ def start(message) -> None:
     text = (
         f'Привет, {name}, я готов работать!\n\n' +
         '/matches - список ближайших матчей\n' +
-        '/teams - таблица лиги\n' +
-        '/matchday - предстоящий тур\n' +
-        '/scorers - список бомбардиров лиги\n' +
+        '/competitions - выбор турнира\n' +
         '/timezone - изменение часового пояса\n' +
         'Пример ввода: /timezone 2, где \n' +
         'цифра - ваш часовой пояс, относительно МСК\n' +
@@ -154,7 +152,7 @@ def matches(message) -> None:
             continue
         button_text = f'{f_match.current_match} ({f_match.name}) '
         if str(f_match.date).startswith(str(dt.utcnow().date())):
-            data = f'{f_match.current_match}&{f_match.name}'
+            data = f'{f_match.current_match}&{f_match.name}&/matches'
             now = dt.utcnow().replace(tzinfo=UTC)
             if now >= f_match.date and now < f_match.date + td(hours=1, minutes=45):
                 button_text += '| IN LIVE'
@@ -182,7 +180,7 @@ def matches(message) -> None:
         )
 
 # Обработка команд /matchday и /teams
-@bot.message_handler(commands=['matchday', 'teams', 'scorers'])
+@bot.message_handler(commands=['competitions'])
 def league_choosing_cmd(message) -> None:
     del_last_msg(message.chat.id, message.message_id)
     button = telebot.types.InlineKeyboardMarkup(row_width=1)
@@ -205,6 +203,27 @@ def league_choosing_cmd(message) -> None:
         reply_markup=button
     )
 
+# Кнопки выбора запросов по чемпионату
+def competitions_choices(callback):
+    league_name = callback.data.split('&')[1]
+    data = f'&{league_name}'
+    button = telebot.types.InlineKeyboardMarkup(row_width=1)
+
+    button.add(
+        telebot.types.InlineKeyboardButton(
+            text='Таблица', callback_data='teams'+data))
+    button.add(
+        telebot.types.InlineKeyboardButton(
+            text='Матчи', callback_data='matchday'+data))
+    button.add(
+        telebot.types.InlineKeyboardButton(
+            text='Бомбардиры', callback_data='scorers'+data))
+    bot.edit_message_text(
+        chat_id=callback.message.chat.id,
+        message_id=callback.message.id,
+        text='Выберите, что хотите посмотреть.',
+        reply_markup=button
+    )
 
 # Выдает матчи актуального matchday
 def matchday(callback) -> None:
@@ -215,7 +234,7 @@ def matchday(callback) -> None:
     button = telebot.types.InlineKeyboardMarkup(row_width=1)
 
     for f_match in matches:
-        data = f'{f_match.current_match}&{league_name}'
+        data = f'{f_match.current_match}&{league_name}&matchday'
         button_text = f'{f_match.current_match} '
         now = dt.utcnow().replace(tzinfo=UTC)
         if f_match.finished:
@@ -235,6 +254,10 @@ def matchday(callback) -> None:
         button.add(
             telebot.types.InlineKeyboardButton(button_text, callback_data=data)
         )
+    button.add(
+            telebot.types.InlineKeyboardButton(
+                text='<--------',
+                callback_data=f'/competitions&{league_name}'))
 
     bot.edit_message_text(
         chat_id=callback.message.chat.id,
@@ -253,7 +276,6 @@ def teams(callback) -> None:
         f'Команды {league_name}\n'+
         'О - очки, В - победы, Н - ничьи,\nП - поражения\n\n'
     )
-
     count = 1
     for team in teams:
         name = team.name
@@ -269,6 +291,10 @@ def teams(callback) -> None:
             telebot.types.InlineKeyboardButton(button_text, callback_data=data)
         )
         count += 1
+    button.add(
+            telebot.types.InlineKeyboardButton(
+                text='<--------',
+                callback_data=f'/competitions&{league_name}'))
 
     bot.edit_message_text(
         chat_id=callback.message.chat.id,
@@ -282,7 +308,7 @@ def scorers(callback) -> None:
     league_name = callback.data.split('&')[1]
     players = Player.objects.filter(league=league_name)
     text = f'Бомбардиры {league_name}\nГ - голы(с пенальти) П - гол. пасы\nИ - игры\n\n'
-
+    button = telebot.types.InlineKeyboardMarkup(row_width=1)
     for player in players:
         name = player.name
         goals = player.goals
@@ -292,17 +318,31 @@ def scorers(callback) -> None:
         matches = player.matches
 
         text += f'{name}({team})\n{goals}({penalty}) Г  {assists} П  |  {matches} И\n\n'
+    button.add(
+            telebot.types.InlineKeyboardButton(
+                text='<--------',
+                callback_data=f'/competitions&{league_name}'))
 
     bot.edit_message_text(
         chat_id=callback.message.chat.id,
         message_id=callback.message.id,
         text=text,
+        reply_markup=button
     )
 
 def stats(callback) -> None:
+    print(callback.data)
     teams_list = callback.data.split('&')[0].split(' - ')
     text = 'Статистика за 10 матчей:\n\n'
+    button = telebot.types.InlineKeyboardMarkup(row_width=1)
+    print(callback.data)
     if len(teams_list) == 2:
+        if callback.data.split('&')[2] == 'matchday':
+            button.add(
+                telebot.types.InlineKeyboardButton(
+                    text='<--------',
+                    callback_data=(
+                        f'matchday&{callback.data.split('&')[1]}')))
         for team_name in teams_list:
             print(team_name)
             text += get_team_stats(team_name=team_name)
@@ -314,11 +354,16 @@ def stats(callback) -> None:
         text += get_teams_probability(teams=teams_list, date=date)
     elif len(teams_list) == 1:
         text += get_team_stats(team_name=teams_list[0])
+        button.add(
+            telebot.types.InlineKeyboardButton(
+                text='<--------',
+                callback_data=f'teams&{callback.data.split('&')[1]}'))
 
     bot.edit_message_text(
         chat_id=callback.message.chat.id,
         message_id=callback.message.id,
-        text=text
+        text=text,
+        reply_markup=button
     )
 
 def get_team_stats(team_name: str) -> str:
@@ -350,7 +395,6 @@ def get_teams_probability(teams: list, date: str) -> str:
 # Логика работы кнопок
 @bot.callback_query_handler(func=lambda c:True)
 def callback_inline(callback):
-    current_commands = ['/matchday', '/teams', '/scorers']
     command = callback.data.split('&')[0]
     league_name = callback.data.split('&')[1]
 
@@ -360,7 +404,7 @@ def callback_inline(callback):
         message_id=callback.message.id
     )
 
-    if command in current_commands:
+    if command == '/competitions':
         is_updating = IsUpdating.objects.get(league_name=league_name)
         is_updating.is_updating = True
         is_updating.save()
@@ -378,11 +422,16 @@ def callback_inline(callback):
         is_updating.is_updating = False
         is_updating.save()
 
-    if command == '/matchday':
+
+    if command == '/competitions':
+        competitions_choices(callback)
+    elif command == '/matches':
+        matches(callback)
+    elif command == 'matchday':
         matchday(callback)
-    elif command == '/teams':
+    elif command == 'teams':
         teams(callback)
-    elif command == '/scorers':
+    elif command == 'scorers':
         scorers(callback)
     else:
         stats(callback)
