@@ -23,7 +23,7 @@ def from_response_time_to_datetime(response_time) -> dt:
 class AfterUpdate:
     def __init__(
             self,
-            league_name: str = str()) -> None:
+            league_name: str) -> None:
         self.league = League.objects.get(name=league_name)
         self.league_response = LeagueResponse(
             league=self.league)
@@ -40,12 +40,12 @@ class AfterMatchdayUpdate(AfterUpdate):
         self.matchday_matches_update()
         self.matchday_number_update()
         self.matchday_start_end_date_update()
+        self.team_points_full_update()
         updated_matches = LeagueMatches.objects.filter(name=self.league.name)
         for f_match in updated_matches:
             teams = f_match.current_match.split(' - ')
             for team in teams:
                 self.team_stats_update(team_name=team)
-                #sleep(24.1)
 
     # обновляет матчи предстоящего тура
     def matchday_matches_update(self) -> None:
@@ -98,11 +98,15 @@ class AfterMatchdayUpdate(AfterUpdate):
         matches = TeamResponse(team_name=team_name).last_10_team_matches()
         stats = Statistics.objects.create(name=team_name)
 
-        is_home = False
         count = 0
         for match in matches:
             if count == 10:
                 break
+
+            is_home = False
+
+            if match.get('competition').get('name') != self.league.name:
+                continue
 
             if match.get('homeTeam').get('shortName') == team_name:
                 home_away_team = 'HOME'
@@ -112,9 +116,10 @@ class AfterMatchdayUpdate(AfterUpdate):
             results = match.get('score')
             result = results.get('winner')
 
-            if result == 'null':
+            if result is None:
                 continue
 
+            print(is_home, home_away_team)
             if is_home:
                 stats.goals_scored += results.get('fullTime').get('home')
                 stats.goals_conceded += results.get('fullTime').get('away')
@@ -127,31 +132,52 @@ class AfterMatchdayUpdate(AfterUpdate):
                 stats.form += GREEN_EMOJI
                 if home_away_team == 'HOME':
                     stats.home_form += GREEN_EMOJI
-                    stats.home_wins += 1
-
                 else:
                     stats.away_form += GREEN_EMOJI
-                    stats.away_wins += 1
             elif result == 'DRAW':
                 stats.draws += 1
                 stats.form += ORANGE_EMOJI
                 if home_away_team == 'HOME':
                     stats.home_form += ORANGE_EMOJI
-                    stats.home_draws += 1
                 else:
                     stats.away_form += ORANGE_EMOJI
-                    stats.away_draws += 1
             else:
                 stats.loses += 1
                 stats.form += RED_EMOJI
                 if home_away_team == 'HOME':
                     stats.home_form += RED_EMOJI
-                    stats.home_loses += 1
                 else:
                     stats.away_form += RED_EMOJI
-                    stats.away_loses += 1
             stats.save()
             count += 1
+
+        a = Statistics.objects.get(name=team_name)
+        print(f'{a.goals_scored}' + '- Забито')
+        print(f'{a.goals_conceded}' + '- Пропущено')
+
+    # обновляет очки команды, победы, поражения, ничьи
+    # обновляет api-запросом
+    def team_points_full_update(self) -> None:
+        print(self.team_points_full_update.__name__)
+        teams = self.league_response.standing_response().get('table')
+
+        for team in teams:
+
+            name = team.get('team').get('shortName')
+            position = team.get('position')
+            points = team.get('points')
+            wins = team.get('won')
+            draws = team.get('draw')
+            loses = team.get('lost')
+
+
+            team_db = Team.objects.get(name=name)
+            team_db.position = position
+            team_db.points = points
+            team_db.total_wins = wins
+            team_db.total_draws = draws
+            team_db.total_loses = loses
+            team_db.save()
 
 
 class AfterMatchUpdate(AfterUpdate):
@@ -180,6 +206,9 @@ class AfterMatchUpdate(AfterUpdate):
             if home_team not in home_teams:
                 continue
 
+            if f_match.get('status') != 'FINISHED':
+                continue
+
             fulltime = f_match.get('score').get('fullTime')
             home_goals = fulltime.get('home')
             away_goals = fulltime.get('away')
@@ -187,29 +216,6 @@ class AfterMatchUpdate(AfterUpdate):
                 current_match__istartswith=home_team)
             league_match.fulltime = f'{home_goals}-{away_goals}'
             league_match.save()
-
-            is_home_win = False
-            is_draw = False
-            is_away_win = False
-
-            if home_goals > away_goals:
-                is_home_win = True
-            elif home_goals < away_goals:
-                is_draw = True
-            else:
-                is_away_win = True
-
-            self.team_points_update(
-                team_name=home_team,
-                is_win=is_home_win,
-                is_draw=is_draw
-            )
-
-            self.team_points_update(
-                team_name=away_team,
-                is_win=is_away_win,
-                is_draw=is_draw
-            )
 
 
     # обновляет список бомбардиров лиги
@@ -226,6 +232,7 @@ class AfterMatchUpdate(AfterUpdate):
             goals = player.get('goals')
             penalty = player.get('penalties')
             assists = player.get('assists')
+            matches = player.get('playedMatches')
 
             if penalty is None:
                 penalty = 0
@@ -233,6 +240,8 @@ class AfterMatchUpdate(AfterUpdate):
                 assists = 0
             if goals is None:
                 goals = 0
+            if matches is None:
+                matches = 0
 
             Player.objects.create(
                 name=name,
@@ -240,46 +249,37 @@ class AfterMatchUpdate(AfterUpdate):
                 team=team,
                 goals=goals,
                 penalty=penalty,
-                assists=assists
+                assists=assists,
+                matches=matches
             )
 
-    # обновляет очки команды, победы, поражения, ничьи
-    # обновление рассчетом
-    def team_points_update(
-            self,
-            team_name: str,
-            is_win: bool=False,
-            is_draw: bool=False) -> None:
-        print(self.team_points_update.__name__)
-        team = Team.objects.get(name=team_name)
 
-        if is_win:
-            team.total_wins += 1
-            team.points += 3
-        elif is_draw:
-            team.total_draws += 1
-            team.points += 1
-        else:
-            team.total_loses += 1
-
-        team.save()
-
-    # обновляет очки команды, победы, поражения, ничьи
-    # обновляет api-запросом
-    def team_points_full_update(self) -> None:
-        print(self.team_points_full_update.__name__)
-        teams = self.league_response.standing_response().get('table')
+class AfterSeasonUpdate(AfterUpdate):
+    def league_teams_update(self):
+        print(self.league_teams_update.__name__)
+        teams = LeagueResponse(league=self.league).league_teams_response()
+        Team.objects.filter(league=self.league.name).delete()
 
         for team in teams:
-            name = team.get('team').get('shortName')
-            points = team.get('points')
-            wins = team.get('wons')
-            draws = team.get('draw')
-            loses = team.get('lost')
+            name = team.get('shortName')
+            shortname = team.get('tla')
+            url_id = team.get('id')
+            league = self.league.name
 
-            team_db = Team.objects.get(name=name)
-            team_db.points = points
-            team_db.total_wins = wins
-            team_db.total_draws = draws
-            team_db.total_loses = loses
-            team_db.save()
+            Team.objects.create(
+                name=name,
+                shortname=shortname,
+                url_id=url_id,
+                league=league
+            )
+
+
+def datetime_to_text(datetime_type) -> str:
+    date = str(datetime_type.date()).split('-')
+    time = str(datetime_type.time()).split(':')
+    month = date[1]
+    day = date[2]
+    hour = time[0]
+    minutes = time[1]
+
+    return f'{day}.{month} {hour}:{minutes}'

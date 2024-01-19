@@ -6,6 +6,22 @@ from django.core.validators import (
 from django.db import models
 
 
+class User(models.Model):
+    username = models.CharField(
+        max_length=100,
+        verbose_name='Имя пользователя',
+        unique=True
+    )
+    time_zone = models.IntegerField(
+        verbose_name='Часовой пояс',
+        default=0,
+        validators=[
+            MinValueValidator(-12),
+            MaxValueValidator(12)
+        ]
+    )
+
+
 class League(models.Model):
     name = models.CharField(
         max_length=50,
@@ -15,6 +31,11 @@ class League(models.Model):
         max_length=5,
         verbose_name='Код лиги',
         unique=True
+    )
+    country = models.CharField(
+        max_length=20,
+        verbose_name='Страна лиги',
+        blank=True
     )
     current_matchday = models.IntegerField(
         verbose_name='Предстоящий тур',
@@ -90,6 +111,14 @@ class Team(models.Model):
     league = models.CharField(
         max_length=100,
         verbose_name='Лига',
+    )
+    position = models.IntegerField(
+        verbose_name='Позиция в таблице',
+        default=1,
+        validators=[
+            MinValueValidator(1),
+            MaxValueValidator(40)
+        ]
     )
     total_wins = models.IntegerField(
         verbose_name='Общее кол-во побед',
@@ -170,6 +199,17 @@ class Player(models.Model):
             MaxValueValidator(200)
         ]
     )
+    matches = models.IntegerField(
+        verbose_name='Кол-во матчей',
+        default=0,
+        validators=[
+            MinValueValidator(1),
+            MaxValueValidator(50)
+        ]
+    )
+
+    def __str__(self):
+        return self.name
 
     class Meta:
         ordering = ['league', '-goals']
@@ -209,54 +249,6 @@ class Statistics(models.Model):
             MaxValueValidator(40)
         ]
     )
-    home_wins = models.IntegerField(
-        verbose_name='Домашние победы',
-        default=0,
-        validators=[
-            MinValueValidator(1),
-            MaxValueValidator(40)
-        ]
-    )
-    home_draws = models.IntegerField(
-        verbose_name='Домашние ничьи',
-        default=0,
-        validators=[
-            MinValueValidator(1),
-            MaxValueValidator(40)
-        ]
-    )
-    home_loses = models.IntegerField(
-        verbose_name='Домашние поражения',
-        default=0,
-        validators=[
-            MinValueValidator(1),
-            MaxValueValidator(40)
-        ]
-    )
-    away_wins = models.IntegerField(
-        verbose_name='Гостевые победы',
-        default=0,
-        validators=[
-            MinValueValidator(1),
-            MaxValueValidator(40)
-        ]
-    )
-    away_draws = models.IntegerField(
-        verbose_name='Гостевые ничьи',
-        default=0,
-        validators=[
-            MinValueValidator(1),
-            MaxValueValidator(40)
-        ]
-    )
-    away_loses = models.IntegerField(
-        verbose_name='Гостевые поражения',
-        default=0,
-        validators=[
-            MinValueValidator(1),
-            MaxValueValidator(40)
-        ]
-    )
     form = models.CharField(
         max_length=10,
         blank=True,
@@ -288,6 +280,7 @@ class Statistics(models.Model):
     def __str__(self):
         return self.name
 
+
 class Requests(models.Model):
     count = models.IntegerField(
         verbose_name='количество запросов',
@@ -301,3 +294,16 @@ class Requests(models.Model):
         verbose_name = 'Дата и время начала тура',
         auto_now=True
     )
+
+
+class IsUpdating(models.Model):
+    league_name = models.CharField(
+        max_length=50,
+        blank=True
+    )
+    is_updating = models.BooleanField(
+        default=False
+    )
+
+    def __str__(self):
+        return f'{self.league_name} - {self.is_updating}'

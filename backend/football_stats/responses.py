@@ -6,6 +6,8 @@ from datetime import date, datetime as dt, timedelta as td
 from time import sleep
 from pytz import UTC
 
+from .models import League
+
 from .models import League, Team, Requests
 
 
@@ -17,14 +19,18 @@ HEADERS = {
 }
 
 
-def count_requests_check():
+def count_requests_check() -> None:
+    object = Requests.objects.get(id=1)
+    if dt.utcnow().replace(tzinfo=UTC) >= object.last_update_date + td(minutes=1, milliseconds=1):
+        object.count = 0
+        object.save()
+        print(f'REQUESTS - {object.count}')
+        return
+
     object = Requests.objects.get(id=1)
     object.count += 1
     object.save()
     print(f'REQUESTS - {object.count}')
-    if dt.utcnow().replace(tzinfo=UTC) >= object.last_update_date + td(minutes=1, milliseconds=1):
-        object.count = 0
-        object.save()
 
     if dt.utcnow().replace(tzinfo=UTC) < object.last_update_date + td(minutes=1, milliseconds=1) and (
         object.count >= 10
@@ -38,9 +44,8 @@ def count_requests_check():
         object.save()
         sleep(sleeping_time)
 
-
 class LeagueResponse:
-    def __init__(self, league: League) -> None:
+    def __init__(self, league: League = League()) -> None:
         self.league = league
 
         league_code = self.league.league_code
@@ -69,15 +74,24 @@ class LeagueResponse:
         url = self.league_url + 'standings'
         response = requests.get(url=url, headers=HEADERS).json()
         count_requests_check()
-        return response
+        return response.get('standings')[0]
+
+    def league_teams_response(self) -> dict:
+        print(self.league_teams_response.__name__)
+        url = self.league_url + '/teams'
+        response = requests.get(url=url, headers=HEADERS).json()
+        count_requests_check()
+        return response.get('teams')
 
 
-class TeamResponse:
-    def __init__(self, team_name) -> None:
+class TeamResponse(LeagueResponse):
+    def __init__(self, team_name: str) -> None:
+
         self.team = Team.objects.get(name=team_name)
         self.team_matches_url = f'{os.getenv("TEAMS_URL")}'
 
     def last_10_team_matches(self) -> dict:
+        print(self.last_10_team_matches.__name__)
         current_date = date.today()
         url = self.team_matches_url + (
             f'/{self.team.url_id}' +
