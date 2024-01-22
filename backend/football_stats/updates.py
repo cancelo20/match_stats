@@ -1,23 +1,28 @@
 from pytz import UTC
 from datetime import datetime as dt
 
-from .models import *
+from .models import (
+    LeagueMatches,
+    Statistics,
+    League,
+    Player,
+    Team
+)
 from .responses import (
     LeagueResponse, TeamResponse)
 
 
-
 def from_response_time_to_datetime(response_time) -> dt:
-        date_time = response_time.split('T')
-        date = date_time[0].split('-')
-        year = int(date[0])
-        month = int(date[1])
-        day = int(date[2])
-        time = date_time[1].split(':')
-        hour = int(time[0])
-        minute = int(time[1])
+    date_time = response_time.split('T')
+    date = date_time[0].split('-')
+    year = int(date[0])
+    month = int(date[1])
+    day = int(date[2])
+    time = date_time[1].split(':')
+    hour = int(time[0])
+    minute = int(time[1])
 
-        return dt(year, month, day, hour, minute, tzinfo=UTC)
+    return dt(year, month, day, hour, minute, tzinfo=UTC)
 
 
 class AfterUpdate:
@@ -78,7 +83,8 @@ class AfterMatchdayUpdate(AfterUpdate):
     # обновляет дату начала и окончания тура
     def matchday_start_end_date_update(self) -> None:
         print(self.matchday_start_end_date_update.__name__)
-        start_date = LeagueMatches.objects.filter(name=self.league.name)[0].date
+        start_date = LeagueMatches.objects.filter(
+            name=self.league.name)[0].date
         end_date = LeagueMatches.objects.filter(
              name=self.league.name).order_by('-date')[0].date
 
@@ -170,7 +176,6 @@ class AfterMatchdayUpdate(AfterUpdate):
             draws = team.get('draw')
             loses = team.get('lost')
 
-
             team_db = Team.objects.get(name=name)
             team_db.position = position
             team_db.points = points
@@ -184,7 +189,6 @@ class AfterMatchUpdate(AfterUpdate):
     def __init__(
             self,
             league_name: str = str(),
-            team_name: str = str(),
             matches_list: list = list()) -> None:
         super().__init__(league_name)
         self.matches_list = matches_list
@@ -206,7 +210,9 @@ class AfterMatchUpdate(AfterUpdate):
             if home_team not in home_teams:
                 continue
 
-            if f_match.get('status') != 'FINISHED':
+            status = f_match.get('status')
+
+            if status == 'TIMED' or status == 'IN_PLAY':
                 continue
 
             fulltime = f_match.get('score').get('fullTime')
@@ -214,9 +220,13 @@ class AfterMatchUpdate(AfterUpdate):
             away_goals = fulltime.get('away')
             league_match = LeagueMatches.objects.get(
                 current_match__istartswith=home_team)
-            league_match.fulltime = f'{home_goals}-{away_goals}'
-            league_match.save()
 
+            if status == 'POSTPONED':
+                league_match.fulltime = 'Перенесен'
+            elif status == 'FINISHED':
+                league_match.fulltime = f'{home_goals} - {away_goals}'
+            league_match.finished = True
+            league_match.save()
 
     # обновляет список бомбардиров лиги
     def top_scorers_update(self) -> None:

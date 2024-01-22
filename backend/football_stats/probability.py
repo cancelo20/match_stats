@@ -1,7 +1,4 @@
-from datetime import timedelta as td
-
-from .models import LeagueMatches, Statistics
-from .updates import datetime_to_text
+from .models import Statistics
 
 
 class MatchProbability:
@@ -15,15 +12,18 @@ class MatchProbability:
         NUMBER_OF_MATCHES = 20
 
         team1_win_probability = int((
-            self.home_team.wins + self.away_team.loses) / NUMBER_OF_MATCHES * 100)
+            self.home_team.wins + self.away_team.loses) / (
+                NUMBER_OF_MATCHES * 100))
         team2_win_probability = int((
-            self.away_team.wins + self.home_team.loses) / NUMBER_OF_MATCHES * 100)
+            self.away_team.wins + self.home_team.loses) / (
+                NUMBER_OF_MATCHES * 100))
         draw_probability = int((
-            self.home_team.draws + self.away_team.draws) / NUMBER_OF_MATCHES * 100)
+            self.home_team.draws + self.away_team.draws) / (
+                NUMBER_OF_MATCHES * 100))
 
         return team1_win_probability, team2_win_probability, draw_probability
 
-    #Возвращает среднее количество голов за 10 матчей
+    # Возвращает среднее количество голов за 10 матчей
     def score_average(self) -> tuple:
         print(self.score_average.__name__)
         NUMBER_OF_MATCHES = 10
@@ -59,8 +59,10 @@ class MatchProbability:
             f'   Ничья: {win_probability[2]}%\n' +
             f'   Победа {self.away_team.name}: {win_probability[1]}%\n\n' +
             'Среднее количество забитых-пропущенных голов:\n' +
-            f'   {self.home_team.name}: {score_average[0][0]} - {score_average[0][1]}\n' +
-            f'   {self.away_team.name}: {score_average[1][0]} - {score_average[1][1]}\n'
+            f'   {self.home_team.name}: ' +
+            f'{score_average[0][0]} - {score_average[0][1]}\n' +
+            f'   {self.away_team.name}: ' +
+            f'{score_average[1][0]} - {score_average[1][1]}\n'
         )
 
     def __str__(self):

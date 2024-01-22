@@ -1,13 +1,10 @@
 import os
 import requests
 
-from dotenv import load_dotenv
 from datetime import date, datetime as dt, timedelta as td
+from dotenv import load_dotenv
 from time import sleep
 from pytz import UTC
-
-from .models import League
-
 from .models import League, Team, Requests
 
 
@@ -21,8 +18,11 @@ HEADERS = {
 
 def count_requests_check() -> None:
     object = Requests.objects.get(id=1)
-    if dt.utcnow().replace(tzinfo=UTC) >= object.last_update_date + td(minutes=1, milliseconds=1):
-        object.count = 0
+    if dt.utcnow().replace(tzinfo=UTC) >= (
+        object.last_update_date + td(minutes=1, milliseconds=1)
+    ):
+        object.count = 1
+        object.last_update_date = dt.utcnow().replace(tzinfo=UTC)
         object.save()
         print(f'REQUESTS - {object.count}')
         return
@@ -32,8 +32,9 @@ def count_requests_check() -> None:
     object.save()
     print(f'REQUESTS - {object.count}')
 
-    if dt.utcnow().replace(tzinfo=UTC) < object.last_update_date + td(minutes=1, milliseconds=1) and (
-        object.count >= 10
+    if dt.utcnow().replace(tzinfo=UTC) < (
+        object.last_update_date + td(minutes=1, milliseconds=1)) and (
+            object.count >= 10
     ):
         sleeping_time = (
             object.last_update_date + td(
@@ -43,6 +44,7 @@ def count_requests_check() -> None:
         object.count = 0
         object.save()
         sleep(sleeping_time)
+
 
 class LeagueResponse:
     def __init__(self, league: League = League()) -> None:
@@ -54,33 +56,44 @@ class LeagueResponse:
     def matchday_response(self) -> dict:
         print(self.matchday_response.__name__)
         league_response = requests.get(self.league_url, headers=HEADERS).json()
-        count_requests_check()
-        matchday_number = league_response.get('currentSeason').get('currentMatchday')
 
+        count_requests_check()
+
+        matchday_number = league_response.get('currentSeason').get(
+            'currentMatchday'
+        )
         url = self.league_url + f'matches?matchday={matchday_number}'
         response = requests.get(url=url, headers=HEADERS)
+
         count_requests_check()
+
         return response.json()
 
     def top_scorers_response(self) -> dict:
         print(self.top_scorers_response.__name__)
         url = self.league_url + 'scorers'
         response = requests.get(url=url, headers=HEADERS).json()
+
         count_requests_check()
+
         return response
 
     def standing_response(self) -> dict:
         print(self.standing_response.__name__)
         url = self.league_url + 'standings'
         response = requests.get(url=url, headers=HEADERS).json()
+
         count_requests_check()
+
         return response.get('standings')[0]
 
     def league_teams_response(self) -> dict:
         print(self.league_teams_response.__name__)
         url = self.league_url + '/teams'
         response = requests.get(url=url, headers=HEADERS).json()
+
         count_requests_check()
+
         return response.get('teams')
 
 
@@ -97,5 +110,7 @@ class TeamResponse(LeagueResponse):
             f'/{self.team.url_id}' +
             f'/matches?dateFrom=2023-07-01&dateTo={current_date}&limit=20')
         response = requests.get(url=url, headers=HEADERS).json()
+
         count_requests_check()
+
         return response.get('matches')[::-1]

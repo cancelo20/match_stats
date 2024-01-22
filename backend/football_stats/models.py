@@ -47,11 +47,11 @@ class League(models.Model):
     )
     start_date = models.DateTimeField(
         default=dt(1, 1, 1, 0, 0, 0, tzinfo=UTC),
-        verbose_name = 'Дата и время начала тура'
+        verbose_name='Дата и время начала тура'
     )
     end_date = models.DateTimeField(
         default=dt(1, 1, 1, 0, 0, 0, tzinfo=UTC),
-        verbose_name = 'Дата и время окончания тура'
+        verbose_name='Дата и время окончания тура'
     )
 
     class Meta:
@@ -65,25 +65,25 @@ class League(models.Model):
 
 class LeagueMatches(models.Model):
     name = models.CharField(
-        max_length = 100,
-        verbose_name = 'Название Лиги'
+        max_length=100,
+        verbose_name='Название Лиги'
     )
     current_match = models.CharField(
-        max_length = 100,
-        verbose_name = 'Актуальный матч'
+        max_length=100,
+        verbose_name='Актуальный матч'
     )
     fulltime = models.CharField(
-        max_length = 100,
-        verbose_name = 'Счет матча',
+        max_length=100,
+        verbose_name='Счет матча',
         blank=True
     )
     date = models.DateTimeField(
         default=dt(1, 1, 1, 0, 0, 0, tzinfo=UTC),
-        verbose_name = 'Дата и время матча'
+        verbose_name='Дата и время матча'
     )
     finished = models.BooleanField(
         default=False,
-        verbose_name = 'Проверка на завершенность матча'
+        verbose_name='Проверка на завершенность матча'
     )
 
     class Meta:
@@ -208,9 +208,6 @@ class Player(models.Model):
         ]
     )
 
-    def __str__(self):
-        return self.name
-
     class Meta:
         ordering = ['league', '-goals']
         verbose_name = 'Игрок'
@@ -252,17 +249,17 @@ class Statistics(models.Model):
     form = models.CharField(
         max_length=10,
         blank=True,
-        verbose_name = 'Форма команды'
+        verbose_name='Форма команды'
     )
     home_form = models.CharField(
         max_length=10,
         blank=True,
-        verbose_name = 'Домашняя форма команды'
+        verbose_name='Домашняя форма команды'
     )
     away_form = models.CharField(
         max_length=10,
         blank=True,
-        verbose_name = 'Гостевая форма команды'
+        verbose_name='Гостевая форма команды'
     )
     goals_scored = models.PositiveSmallIntegerField(
         verbose_name='Забитые голы',
@@ -291,8 +288,8 @@ class Requests(models.Model):
         ]
     )
     last_update_date = models.DateTimeField(
-        verbose_name = 'Дата и время начала тура',
-        auto_now=True
+        verbose_name='Дата и время начала тура',
+        default=dt(1, 1, 1, 0, 0, 0, tzinfo=UTC)
     )
 
 
