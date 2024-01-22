@@ -93,8 +93,6 @@ class Checks:
                     break
                 sleep(5)
 
-
-
     # Проверка обновлений
     def check_updates(self) -> None:
         print(self.check_updates.__name__)

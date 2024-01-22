@@ -8,6 +8,7 @@ from .models import (
     Player,
     Team
 )
+from .probability import MatchProbability
 from .responses import (
     LeagueResponse, TeamResponse)
 
@@ -153,7 +154,6 @@ class AfterMatchdayUpdate(AfterUpdate):
             stats.save()
             count += 1
 
-
     # обновляет очки команды, победы, поражения, ничьи
     # обновляет api-запросом
     def team_points_full_update(self) -> None:
@@ -275,6 +275,7 @@ class AfterSeasonUpdate(AfterUpdate):
             )
 
 
+# Переводит дату из datetime в текст
 def datetime_to_text(datetime_type) -> str:
     date = str(datetime_type.date()).split('-')
     time = str(datetime_type.time()).split(':')
@@ -284,3 +285,30 @@ def datetime_to_text(datetime_type) -> str:
     minutes = time[1]
 
     return f'{day}.{month} {hour}:{minutes}'
+
+
+# Выдает статистику команды
+def get_team_stats(team_name: str) -> str:
+    print(get_team_stats.__name__)
+    position = Team.objects.get(name=team_name).position
+    stats = Statistics.objects.get(name=team_name)
+    text = f'{team_name} ({position} место)\n'
+    text += f'Победы: {stats.wins}\n'
+    text += f'Ничьи: {stats.draws}\n'
+    text += f'Поражения: {stats.loses}\n'
+    text += f'Форма: {stats.form[::-1]}\n'
+    text += f'Форма дома: {stats.home_form[::-1]}\n'
+    text += f'Форма в гостях: {stats.away_form[::-1]}\n'
+    text += f'Голов забито: {stats.goals_scored}\n'
+    text += f'Голов пропущено: {stats.goals_conceded}\n\n'
+
+    return text
+
+
+# Выдает шансы на победу команд
+def get_teams_probability(teams: list, date: str) -> str:
+    home_team = teams[0]
+    away_team = teams[1]
+    return MatchProbability(
+        home_team=home_team, away_team=away_team
+    ).print_result(date=date)

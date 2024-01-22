@@ -8,11 +8,13 @@ from datetime import datetime as dt, timedelta as td
 from django.core.management import BaseCommand
 
 from football_stats.checks import Checks
-from football_stats.probability import MatchProbability
-from football_stats.updates import datetime_to_text
+from football_stats.updates import (
+    datetime_to_text,
+    get_team_stats,
+    get_teams_probability
+)
 from football_stats.models import (
     LeagueMatches,
-    Statistics,
     League,
     Player,
     Team,
@@ -189,6 +191,7 @@ def matches_page(
 
 
 matches_list = list()
+
 
 # Обработка команды /matches
 @bot.message_handler(commands=['matches'])
@@ -442,33 +445,6 @@ def stats(callback) -> None:
         text=text,
         reply_markup=button
     )
-
-
-# Выдает статистику команды
-def get_team_stats(team_name: str) -> str:
-    print(get_team_stats.__name__)
-    position = Team.objects.get(name=team_name).position
-    stats = Statistics.objects.get(name=team_name)
-    text = f'{team_name} ({position} место)\n'
-    text += f'Победы: {stats.wins}\n'
-    text += f'Ничьи: {stats.draws}\n'
-    text += f'Поражения: {stats.loses}\n'
-    text += f'Форма: {stats.form[::-1]}\n'
-    text += f'Форма дома: {stats.home_form[::-1]}\n'
-    text += f'Форма в гостях: {stats.away_form[::-1]}\n'
-    text += f'Голов забито: {stats.goals_scored}\n'
-    text += f'Голов пропущено: {stats.goals_conceded}\n\n'
-
-    return text
-
-
-# Выдает шансы на победу команд
-def get_teams_probability(teams: list, date: str) -> str:
-    home_team = teams[0]
-    away_team = teams[1]
-    return MatchProbability(
-        home_team=home_team, away_team=away_team
-    ).print_result(date=date)
 
 
 # Логика работы кнопок
