@@ -11,15 +11,12 @@ class MatchProbability:
         print(self.win_probability.__name__)
         NUMBER_OF_MATCHES = 20
 
-        team1_win_probability = int((
-            self.home_team.wins + self.away_team.loses) / (
-                NUMBER_OF_MATCHES * 100))
-        team2_win_probability = int((
-            self.away_team.wins + self.home_team.loses) / (
-                NUMBER_OF_MATCHES * 100))
-        draw_probability = int((
-            self.home_team.draws + self.away_team.draws) / (
-                NUMBER_OF_MATCHES * 100))
+        team1_win_probability = int(
+            (self.home_team.wins + self.away_team.loses) / NUMBER_OF_MATCHES * 100)
+        team2_win_probability = int(
+            (self.away_team.wins + self.home_team.loses) / NUMBER_OF_MATCHES * 100)
+        draw_probability = int(
+            (self.home_team.draws + self.away_team.draws) / NUMBER_OF_MATCHES * 100)
 
         return team1_win_probability, team2_win_probability, draw_probability
 
