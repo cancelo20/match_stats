@@ -38,15 +38,12 @@ class AfterMatchdayUpdate(AfterUpdate):
     # выполняет все функции класса
     def matchday_update_all(self) -> None:
         print(self.matchday_update_all.__name__)
-        matches = self.league_response.matchday_response().get('matches')
-        league_matches = LeagueMatches.objects.filter(name=self.league.name)
-        if matches[0].get('status') == 'FINISHED' and (league_matches):
-            return
-        self.matchday_matches_update()
         self.matchday_number_update()
+        self.matchday_matches_update()
         self.matchday_start_end_date_update()
         self.team_points_full_update()
         updated_matches = LeagueMatches.objects.filter(name=self.league.name)
+
         for f_match in updated_matches:
             teams = f_match.current_match.split(' - ')
             for team in teams:
@@ -58,7 +55,6 @@ class AfterMatchdayUpdate(AfterUpdate):
         LeagueMatches.objects.filter(name=self.league.name).delete()
 
         matches = self.league_response.matchday_response().get('matches')
-
         for match in matches:
             home_team = match.get('homeTeam').get('shortName')
             away_team = match.get('awayTeam').get('shortName')
@@ -74,11 +70,12 @@ class AfterMatchdayUpdate(AfterUpdate):
     # обновляет номер matchday
     def matchday_number_update(self) -> None:
         print(self.matchday_number_update.__name__)
-        matchday_number = self.league_response.matchday_response().get(
-            'filters').get('matchday')
+        matchday_number = int(
+            self.league_response.current_matchday_number())
 
-        self.league.current_matchday = matchday_number
-        self.league.save()
+        if dt.utcnow().replace(tzinfo=UTC) > self.league.end_date:
+            self.league.current_matchday = matchday_number + 1
+            self.league.save()
 
     # обновляет дату начала и окончания тура
     def matchday_start_end_date_update(self) -> None:

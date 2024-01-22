@@ -75,5 +75,8 @@ class Command(BaseCommand):
                 except Exception as error:
                     print(error)
                     continue
+                finally:
+                    print('NO IN LIVE')
+                    sleep(10)
         Thread(target=run, daemon=True).start()
         input('Press <Enter> to exit.\n')

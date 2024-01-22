@@ -7,7 +7,7 @@ from datetime import (
 from time import sleep
 from pytz import UTC
 
-from .models import LeagueMatches, IsUpdating
+from .models import League, LeagueMatches, IsUpdating
 from .updates import AfterMatchdayUpdate, AfterMatchUpdate
 
 
@@ -30,8 +30,8 @@ class Checks:
     def is_current_tour(self) -> None:
         print(self.is_current_tour.__name__)
         try:
-            last_match_date = LeagueMatches.objects.filter(
-                name=self.league_name).order_by('-date')[0].date
+            last_match_date = League.objects.get(
+                name=self.league_name).end_date
         except Exception:
             # список не создан
             update = AfterMatchdayUpdate(league_name=self.league_name)
@@ -39,7 +39,7 @@ class Checks:
             print('Тур был не создан')
         else:
             # обновить список
-            if dt.utcnow().replace(tzinfo=UTC) > last_match_date + td(days=1):
+            if dt.utcnow().replace(tzinfo=UTC) > last_match_date + td(hours=3):
                 update = AfterMatchdayUpdate(league_name=self.league_name)
                 update.matchday_update_all()
                 print('Тур обновлен')
@@ -93,28 +93,17 @@ class Checks:
                     break
                 sleep(5)
 
+
+
     # Проверка обновлений
     def check_updates(self) -> None:
         print(self.check_updates.__name__)
         is_updating = IsUpdating.objects.get(league_name=self.league_name)
         is_updating.is_updating = True
         is_updating.save()
-        check = Checks(
-            league_name=self.league_name,
-            chat_id=self.chat_id,
-            message_id=self.message_id
-        )
-        check.is_current_tour()
-        check.is_matches_finished()
+
+        self.is_current_tour()
+        self.is_matches_finished()
 
         is_updating.is_updating = False
         is_updating.save()
-
-        try:
-            bot.edit_message_text(
-                chat_id=self.chat_id,
-                message_id=self.message_id,
-                text='Проверка обновлений, пожалуйста, подождите...'
-            )
-        except Exception:
-            pass

@@ -53,15 +53,18 @@ class LeagueResponse:
         league_code = self.league.league_code
         self.league_url = f'{os.getenv("LEAGUES_URL")}/{league_code}/'
 
+    def current_matchday_number(self) -> int:
+        response = requests.get(
+            url=self.league_url, headers=HEADERS).json()
+
+        return int(
+            response.get('currentSeason').get('currentMatchday')
+        )
+
     def matchday_response(self) -> dict:
         print(self.matchday_response.__name__)
-        league_response = requests.get(self.league_url, headers=HEADERS).json()
-
-        count_requests_check()
-
-        matchday_number = league_response.get('currentSeason').get(
-            'currentMatchday'
-        )
+        matchday_number = League.objects.get(
+            name=self.league.name).current_matchday
         url = self.league_url + f'matches?matchday={matchday_number}'
         response = requests.get(url=url, headers=HEADERS)
 

@@ -43,7 +43,8 @@ class Command(BaseCommand):
                         '_' * 54
                     )
                     bot.infinity_polling()
-                except Exception:
+                except Exception as error:
+                    print(error)
                     continue
 
         Thread(target=run, daemon=True).start()
@@ -489,6 +490,11 @@ def callback_inline(callback):
         pass
 
     if command == 'competitions':
+        bot.edit_message_text(
+            chat_id=callback.message.chat.id,
+            message_id=callback.message.id,
+            text='Проверка обновлений, пожалуйста, подождите...'
+        )
         Checks(
             chat_id=callback.message.chat.id,
             message_id=callback.message.id,
