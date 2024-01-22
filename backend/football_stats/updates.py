@@ -122,7 +122,6 @@ class AfterMatchdayUpdate(AfterUpdate):
             if result is None:
                 continue
 
-            print(is_home, home_away_team)
             if is_home:
                 stats.goals_scored += results.get('fullTime').get('home')
                 stats.goals_conceded += results.get('fullTime').get('away')
@@ -154,9 +153,6 @@ class AfterMatchdayUpdate(AfterUpdate):
             stats.save()
             count += 1
 
-        a = Statistics.objects.get(name=team_name)
-        print(f'{a.goals_scored}' + '- Забито')
-        print(f'{a.goals_conceded}' + '- Пропущено')
 
     # обновляет очки команды, победы, поражения, ничьи
     # обновляет api-запросом
@@ -202,8 +198,6 @@ class AfterMatchUpdate(AfterUpdate):
 
         for f_match in matches:
             home_team = f_match.get('homeTeam').get('shortName')
-            away_team = f_match.get('awayTeam').get('shortName')
-            print(f'{home_team} - {away_team}')
             if home_team not in home_teams:
                 continue
 

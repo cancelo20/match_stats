@@ -398,7 +398,6 @@ def scorers(callback) -> None:
 
 # Выдает статистику за последние 10 матчей
 def stats(callback) -> None:
-    print(callback.data)
     teams_list = callback.data.split('&')[0].split(' - ')
     text = 'Статистика за 10 матчей:\n\n'
     button = telebot.types.InlineKeyboardMarkup(row_width=1)
@@ -421,7 +420,6 @@ def stats(callback) -> None:
                         f'{command}&{page}&same_page')))
 
         for team_name in teams_list:
-            print(team_name)
             text += get_team_stats(team_name=team_name)
         f_match = LeagueMatches.objects.get(
             current_match=f'{teams_list[0]} - {teams_list[1]}')
@@ -478,7 +476,6 @@ def get_teams_probability(teams: list, date: str) -> str:
 def callback_inline(callback):
     command = callback.data.split('&')[0]
     data = callback.data.split('&')[1]
-    print(callback.data)
 
     try:
         Checks(
