@@ -8,7 +8,6 @@ class MatchProbability:
 
     # Возвращает процент исхода каждого события
     def win_probability(self) -> tuple:
-        print(self.win_probability.__name__)
         NUMBER_OF_MATCHES = 20
 
         team1_win_probability = int(
@@ -22,7 +21,6 @@ class MatchProbability:
 
     # Возвращает среднее количество голов за 10 матчей
     def score_average(self) -> tuple:
-        print(self.score_average.__name__)
         NUMBER_OF_MATCHES = 10
 
         team1_goals = self.home_team.goals_scored
@@ -44,7 +42,6 @@ class MatchProbability:
 
     # Возвращает строку с текстом расчетов
     def print_result(self, date: str):
-        print(self.print_result.__name__)
         win_probability = self.win_probability()
         score_average = self.score_average()
 

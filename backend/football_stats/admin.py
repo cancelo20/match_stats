@@ -5,8 +5,7 @@ from .models import (
     IsUpdating,
     League,
     Player,
-    Team,
-    User
+    Team
 )
 
 admin.site.register(LeagueMatches)
@@ -15,4 +14,3 @@ admin.site.register(IsUpdating)
 admin.site.register(League)
 admin.site.register(Player)
 admin.site.register(Team)
-admin.site.register(User)

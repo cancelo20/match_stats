@@ -1,6 +1,8 @@
 import os
 import requests
+import logging
 
+from logging.handlers import RotatingFileHandler
 from datetime import date, datetime as dt, timedelta as td
 from dotenv import load_dotenv
 from time import sleep
@@ -10,6 +12,24 @@ from .models import League, Team, Requests
 
 load_dotenv()
 
+
+from logging.handlers import RotatingFileHandler
+
+# Здесь задана глобальная конфигурация для всех логгеров
+logging.basicConfig(
+    level=logging.DEBUG,
+    filename='responses.log',
+    format='%(asctime)s, %(levelname)s, %(message)s, %(name)s'
+)
+
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.ERROR)
+handler = RotatingFileHandler('responses.log', maxBytes=50000000, backupCount=5)
+logger.addHandler(handler)
+formatter = logging.Formatter(
+    '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+handler.setFormatter(formatter)
 
 HEADERS = {
     'X-Auth-Token': f'{os.getenv("API_TOKEN")}'
@@ -24,13 +44,11 @@ def count_requests_check() -> None:
         object.count = 1
         object.last_update_date = dt.utcnow().replace(tzinfo=UTC)
         object.save()
-        print(f'REQUESTS - {object.count}')
         return
 
     object = Requests.objects.get(id=1)
     object.count += 1
     object.save()
-    print(f'REQUESTS - {object.count}')
 
     if dt.utcnow().replace(tzinfo=UTC) < (
         object.last_update_date + td(minutes=1, milliseconds=1)) and (
@@ -40,7 +58,6 @@ def count_requests_check() -> None:
             object.last_update_date + td(
                 minutes=1, milliseconds=1) - dt.utcnow().replace(tzinfo=UTC)
             ).seconds
-        print(f'sleeped - {sleeping_time}')
         object.count = 0
         object.save()
         sleep(sleeping_time)
@@ -57,12 +74,21 @@ class LeagueResponse:
         response = requests.get(
             url=self.league_url, headers=HEADERS).json()
 
-        return int(
-            response.get('currentSeason').get('currentMatchday')
-        )
+        count_requests_check()
+
+        try:
+            current_matchday = int(
+                response.get('currentSeason').get('currentMatchday')
+            )
+        except TypeError as error:
+            logger.error(
+                f'{error} in {self.current_matchday_number.__name__}',
+                exc_info=True
+            )
+        else:
+            return current_matchday
 
     def matchday_response(self) -> dict:
-        print(self.matchday_response.__name__)
         matchday_number = League.objects.get(
             name=self.league.name).current_matchday
         url = self.league_url + f'matches?matchday={matchday_number}'
@@ -73,7 +99,6 @@ class LeagueResponse:
         return response.json()
 
     def top_scorers_response(self) -> dict:
-        print(self.top_scorers_response.__name__)
         url = self.league_url + 'scorers'
         response = requests.get(url=url, headers=HEADERS).json()
 
@@ -82,22 +107,36 @@ class LeagueResponse:
         return response
 
     def standing_response(self) -> dict:
-        print(self.standing_response.__name__)
         url = self.league_url + 'standings'
         response = requests.get(url=url, headers=HEADERS).json()
 
         count_requests_check()
 
-        return response.get('standings')[0]
+        try:
+            standings = response.get('standings')[0]
+        except TypeError as error:
+            logger.error(
+                f'{error} in {self.standing_response.__name__}',
+                exc_info=True
+            )
+        else:
+            return standings
 
     def league_teams_response(self) -> dict:
-        print(self.league_teams_response.__name__)
         url = self.league_url + '/teams'
         response = requests.get(url=url, headers=HEADERS).json()
 
         count_requests_check()
 
-        return response.get('teams')
+        try:
+            teams = response.get('teams')
+        except TypeError as error:
+            logger.error(
+                f'{error} in {self.league_teams_response.__name__}',
+                exc_info=True
+            )
+        else:
+            return teams
 
 
 class TeamResponse(LeagueResponse):
@@ -107,7 +146,6 @@ class TeamResponse(LeagueResponse):
         self.team_matches_url = f'{os.getenv("TEAMS_URL")}'
 
     def last_10_team_matches(self) -> dict:
-        print(self.last_10_team_matches.__name__)
         current_date = date.today()
         url = self.team_matches_url + (
             f'/{self.team.url_id}' +
@@ -116,4 +154,12 @@ class TeamResponse(LeagueResponse):
 
         count_requests_check()
 
-        return response.get('matches')[::-1]
+        try:
+            matches = response.get('matches')[::-1]
+        except TypeError as error:
+            logger.error(
+                f'{error} in {self.last_10_team_matches.__name__}',
+                exc_info=True
+            )
+        else:
+            return matches

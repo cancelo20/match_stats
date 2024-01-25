@@ -3,11 +3,10 @@ import telebot
 
 from threading import Thread
 from dotenv import load_dotenv
-from datetime import datetime as dt, timedelta as td
-
+from datetime import timedelta as td
 from django.core.management import BaseCommand
-
-from football_stats.checks import Checks
+from user.models import User, Subscriptions
+from football_stats.processes import runlive, runupdates
 from football_stats.updates import (
     datetime_to_text,
     get_team_stats,
@@ -17,9 +16,9 @@ from football_stats.models import (
     LeagueMatches,
     League,
     Player,
-    Team,
-    User
+    Team
 )
+
 
 load_dotenv()
 
@@ -44,7 +43,9 @@ class Command(BaseCommand):
                         '(https://t.me/EPLStatsBot)\n' +
                         '_' * 54
                     )
-                    bot.infinity_polling()
+                    Thread(target=runlive, daemon=True).start()
+                    Thread(target=runupdates, daemon=True).start()
+                    bot.polling(non_stop=True)
                 except Exception as error:
                     print(error)
                     continue
@@ -83,7 +84,9 @@ def start(message) -> None:
     username = message.from_user.username
 
     if not User.objects.filter(username=username).exists():
-        User.objects.create(username=username)
+        User.objects.create(
+            username=username,
+            chat_id=message.chat.id)
 
     del_last_msg(message.chat.id, message.message_id)
     bot.send_message(
@@ -176,16 +179,22 @@ def matches_page(
                     callback_data=f'matches&{page}&previous'))
 
     if len(matches_list) != 0:
-        bot.edit_message_text(
-            chat_id=chat_id,
-            message_id=message_id,
-            text=f'Ближайшие матчи ({matches_count} матчей)',
-            reply_markup=button
-        )
+        try:
+            bot.edit_message_text(
+                chat_id=chat_id,
+                message_id=message_id,
+                text=f'Ближайшие матчи ({matches_count} матчей)',
+                reply_markup=button
+            )
+        except Exception:
+            bot.send_message(
+                chat_id=chat_id,
+                text=f'Ближайшие матчи ({matches_count} матчей)',
+                reply_markup=button
+            )
     else:
-        bot.edit_message_text(
+        bot.send_message(
             chat_id=chat_id,
-            message_id=message_id,
             text='Сегодня нет матчей'
         )
 
@@ -199,22 +208,18 @@ def matches(message) -> None:
     matches_list.clear()
     del_last_msg(message.chat.id, message.message_id)
 
-    bot.send_message(
-        chat_id=message.chat.id,
-        text='Проверка обновлений, пожалуйста, подождите...'
-    )
-
-    for league in League.objects.all():
-        Checks(
-            chat_id=message.chat.id,
-            message_id=message.message_id,
-            league_name=league.name
-        ).check_updates()
-
     matches = LeagueMatches.objects.all().order_by('date')
+    date = None
 
     for f_match in matches:
-        if str(f_match.date).startswith(str(dt.utcnow().date())):
+        if f_match.finished:
+            continue
+
+        date = f_match.date.date()
+        break
+
+    for f_match in matches:
+        if str(f_match.date).startswith(str(date)):
             matches_list.append(f_match.current_match)
 
     matches_page(
@@ -407,6 +412,25 @@ def stats(callback) -> None:
 
     if len(teams_list) == 2:
         command = callback.data.split('&')[2]
+        user = User.objects.get(
+            username=callback.from_user.username)
+        match = LeagueMatches.objects.get(
+            current_match=f'{teams_list[0]} - {teams_list[1]}')
+
+        if not Subscriptions.objects.filter(
+            user=user, f_match=match
+        ).exists():
+            button_text = 'Подписаться ✅'
+            button_command = 'subscribe'
+        else:
+            button_text = 'Отписаться ❌'
+            button_command = 'unsubscribe'
+        if not match.finished:
+            button.add(telebot.types.InlineKeyboardButton(
+                text=button_text,
+                callback_data=(
+                    f'{button_command}&{teams_list[0]} - {teams_list[1]}'
+            )))
 
         if command == 'matchday':
             button.add(
@@ -426,8 +450,7 @@ def stats(callback) -> None:
             text += get_team_stats(team_name=team_name)
         f_match = LeagueMatches.objects.get(
             current_match=f'{teams_list[0]} - {teams_list[1]}')
-        user = callback.from_user.username
-        timezone = User.objects.get(username=user).time_zone + 3
+        timezone = user.time_zone + 3
         date = datetime_to_text(f_match.date + td(hours=timezone))
         text += get_teams_probability(teams=teams_list, date=date)
     elif len(teams_list) == 1:
@@ -447,32 +470,61 @@ def stats(callback) -> None:
     )
 
 
+# Оформление подписки на матч
+def subscribe(callback):
+    user = User.objects.get(
+        username=callback.from_user.username)
+    match = LeagueMatches.objects.get(
+        current_match=callback.data.split('&')[1]
+    )
+    Subscriptions.objects.get_or_create(
+        user=user, f_match=match
+    )
+    button = telebot.types.InlineKeyboardMarkup(row_width=1)
+    button.add(
+        telebot.types.InlineKeyboardButton(
+            text='Готово! 👍',
+            callback_data='None&None')
+    )
+    button.add(callback.message.reply_markup.keyboard[1][0])
+    bot.edit_message_reply_markup(
+        chat_id=callback.message.chat.id,
+        message_id=callback.message.id,
+        reply_markup=button
+    )
+
+
+# Оформление отписки от матча
+def unsubscribe(callback):
+    user = User.objects.get(
+        username=callback.from_user.username)
+    match = LeagueMatches.objects.get(
+        current_match=callback.data.split('&')[1]
+    )
+    Subscriptions.objects.get(
+        user=user, f_match=match
+    ).delete()
+    button = telebot.types.InlineKeyboardMarkup(row_width=1)
+    button.add(
+        telebot.types.InlineKeyboardButton(
+            text='Готово! 👍',
+            callback_data='None&None')
+    )
+    button.add(callback.message.reply_markup.keyboard[1][0])
+    bot.edit_message_reply_markup(
+        chat_id=callback.message.chat.id,
+        message_id=callback.message.id,
+        reply_markup=button
+    )
+
+
 # Логика работы кнопок
 @bot.callback_query_handler(func=lambda c: True)
 def callback_inline(callback):
     command = callback.data.split('&')[0]
     data = callback.data.split('&')[1]
 
-    try:
-        Checks(
-            league_name=data,
-            chat_id=callback.message.chat.id,
-            message_id=callback.message.id
-        ).check_is_updating()
-    except Exception:
-        pass
-
     if command == 'competitions':
-        bot.edit_message_text(
-            chat_id=callback.message.chat.id,
-            message_id=callback.message.id,
-            text='Проверка обновлений, пожалуйста, подождите...'
-        )
-        Checks(
-            chat_id=callback.message.chat.id,
-            message_id=callback.message.id,
-            league_name=data
-        ).check_updates()
         competitions_choices(callback)
     elif command == 'matches':
         if callback.data.split('&')[2] == 'next':
@@ -493,5 +545,10 @@ def callback_inline(callback):
         teams(callback)
     elif command == 'scorers':
         scorers(callback)
+    elif command == 'subscribe':
+        subscribe(callback)
+    elif command == 'unsubscribe':
+        unsubscribe(callback)
     else:
-        stats(callback)
+        if command != 'None':
+            stats(callback)

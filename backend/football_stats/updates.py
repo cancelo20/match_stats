@@ -1,3 +1,6 @@
+import logging
+
+from logging.handlers import RotatingFileHandler
 from pytz import UTC
 from datetime import datetime as dt
 
@@ -11,6 +14,22 @@ from .models import (
 from .probability import MatchProbability
 from .responses import (
     LeagueResponse, TeamResponse)
+
+
+logging.basicConfig(
+    level=logging.DEBUG,
+    filename='updates.log',
+    format='%(asctime)s, %(levelname)s, %(message)s, %(name)s'
+)
+
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.ERROR)
+handler = RotatingFileHandler('updates.log', maxBytes=50000000, backupCount=5)
+logger.addHandler(handler)
+formatter = logging.Formatter(
+    '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+handler.setFormatter(formatter)
 
 
 def from_response_time_to_datetime(response_time) -> dt:
@@ -38,29 +57,27 @@ class AfterUpdate:
 class AfterMatchdayUpdate(AfterUpdate):
     # выполняет все функции класса
     def matchday_update_all(self) -> None:
-        print(self.matchday_update_all.__name__)
         self.matchday_number_update()
         self.matchday_matches_update()
         self.matchday_start_end_date_update()
         self.team_points_full_update()
-        updated_matches = LeagueMatches.objects.filter(name=self.league.name)
-
-        for f_match in updated_matches:
-            teams = f_match.current_match.split(' - ')
-            for team in teams:
-                self.team_stats_update(team_name=team)
 
     # обновляет матчи предстоящего тура
     def matchday_matches_update(self) -> None:
-        print(self.matchday_matches_update.__name__)
         LeagueMatches.objects.filter(name=self.league.name).delete()
 
         matches = self.league_response.matchday_response().get('matches')
         for match in matches:
-            home_team = match.get('homeTeam').get('shortName')
-            away_team = match.get('awayTeam').get('shortName')
-            league_name = self.league.name
-            date = from_response_time_to_datetime(match.get('utcDate'))
+            try:
+                home_team = match.get('homeTeam').get('shortName')
+                away_team = match.get('awayTeam').get('shortName')
+                league_name = self.league.name
+                date = from_response_time_to_datetime(match.get('utcDate'))
+            except TypeError as error:
+                logger.error(
+                    f'{error} in {self.matchday_matches_update.__name__}',
+                    exc_info=True
+                )
 
             LeagueMatches.objects.create(
                 current_match=f'{home_team} - {away_team}',
@@ -70,7 +87,6 @@ class AfterMatchdayUpdate(AfterUpdate):
 
     # обновляет номер matchday
     def matchday_number_update(self) -> None:
-        print(self.matchday_number_update.__name__)
         matchday_number = int(
             self.league_response.current_matchday_number())
 
@@ -80,7 +96,6 @@ class AfterMatchdayUpdate(AfterUpdate):
 
     # обновляет дату начала и окончания тура
     def matchday_start_end_date_update(self) -> None:
-        print(self.matchday_start_end_date_update.__name__)
         start_date = LeagueMatches.objects.filter(
             name=self.league.name)[0].date
         end_date = LeagueMatches.objects.filter(
@@ -90,10 +105,126 @@ class AfterMatchdayUpdate(AfterUpdate):
         self.league.end_date = end_date
         self.league.save()
 
+    # обновляет очки команды, победы, поражения, ничьи
+    # обновляет api-запросом
+    def team_points_full_update(self) -> None:
+        try:
+            teams = self.league_response.standing_response().get('table')
+        except TypeError as error:
+            logger.error(
+                f'{error} in {self.team_points_full_update.__name__}',
+                exc_info=True
+            )
+        else:
+            for team in teams:
+
+                name = team.get('team').get('shortName')
+                position = team.get('position')
+                points = team.get('points')
+                wins = team.get('won')
+                draws = team.get('draw')
+                loses = team.get('lost')
+
+                team_db = Team.objects.get(name=name)
+                team_db.position = position
+                team_db.points = points
+                team_db.total_wins = wins
+                team_db.total_draws = draws
+                team_db.total_loses = loses
+                team_db.save()
+
+
+class AfterMatchUpdate(AfterUpdate):
+    def __init__(
+            self,
+            league_name: str = str(),
+            matches_list: list = list()) -> None:
+        super().__init__(league_name)
+        self.matches_list = matches_list
+
+    def matches_full_update(self):
+        self.matches_score_update()
+        self.top_scorers_update()
+
+        for match in self.matches_list:
+            for team in match.split(' - '):
+                self.team_stats_update(team_name=team)
+
+    # обновляет счет матчей
+    def matches_score_update(self) -> None:
+        try:
+            matches = self.league_response.matchday_response().get('matches')
+            home_teams = [match.split(' - ')[0] for match in self.matches_list]
+
+            for f_match in matches:
+                home_team = f_match.get('homeTeam').get('shortName')
+                if home_team not in home_teams:
+                    continue
+
+                status = f_match.get('status')
+
+                if status == 'TIMED' or status == 'IN_PLAY':
+                    continue
+
+                fulltime = f_match.get('score').get('fullTime')
+                home_goals = fulltime.get('home')
+                away_goals = fulltime.get('away')
+                league_match = LeagueMatches.objects.get(
+                    current_match__istartswith=home_team)
+
+                if status == 'POSTPONED':
+                    league_match.fulltime = 'Перенесен'
+                elif status == 'FINISHED':
+                    league_match.fulltime = f'{home_goals} - {away_goals}'
+                league_match.finished = True
+                league_match.save()
+        except TypeError as error:
+            logger.error(
+                f'{error} in {self.matches_score_update.__name__}',
+                exc_info=True
+            )
+
+    # обновляет список бомбардиров лиги
+    def top_scorers_update(self) -> None:
+        Player.objects.filter(league=self.league.name).delete()
+        try:
+            players = self.league_response.top_scorers_response().get('scorers')
+
+            for player in players:
+                name = player.get('player').get('name')
+                league = self.league.name
+                team = player.get('team').get('tla')
+                goals = player.get('goals')
+                penalty = player.get('penalties')
+                assists = player.get('assists')
+                matches = player.get('playedMatches')
+
+                if penalty is None:
+                    penalty = 0
+                if assists is None:
+                    assists = 0
+                if goals is None:
+                    goals = 0
+                if matches is None:
+                    matches = 0
+
+                Player.objects.create(
+                    name=name,
+                    league=league,
+                    team=team,
+                    goals=goals,
+                    penalty=penalty,
+                    assists=assists,
+                    matches=matches
+                )
+        except TypeError as error:
+            logger.error(
+                f'{error} in {self.top_scorers_update.__name__}',
+                exc_info=True
+            )
+
     # обновляет статистику 10 последних игр
     def team_stats_update(self, team_name) -> None:
-        print(f'{self.team_stats_update.__name__} - {team_name}')
-
         GREEN_EMOJI = '\U0001F7E2'
         RED_EMOJI = '\U0001F534'
         ORANGE_EMOJI = '\U0001F7E0'
@@ -109,170 +240,82 @@ class AfterMatchdayUpdate(AfterUpdate):
 
             is_home = False
 
-            if match.get('competition').get('name') != self.league.name:
-                continue
+            try:
+                if match.get('competition').get('name') != self.league.name:
+                    continue
 
-            if match.get('homeTeam').get('shortName') == team_name:
-                home_away_team = 'HOME'
-                is_home = True
-            else:
-                home_away_team = 'AWAY'
-            results = match.get('score')
-            result = results.get('winner')
-
-            if result is None:
-                continue
-
-            if is_home:
-                stats.goals_scored += results.get('fullTime').get('home')
-                stats.goals_conceded += results.get('fullTime').get('away')
-            else:
-                stats.goals_scored += results.get('fullTime').get('away')
-                stats.goals_conceded += results.get('fullTime').get('home')
-
-            if result.startswith(home_away_team):
-                stats.wins += 1
-                stats.form += GREEN_EMOJI
-                if home_away_team == 'HOME':
-                    stats.home_form += GREEN_EMOJI
+                if match.get('homeTeam').get('shortName') == team_name:
+                    home_away_team = 'HOME'
+                    is_home = True
                 else:
-                    stats.away_form += GREEN_EMOJI
-            elif result == 'DRAW':
-                stats.draws += 1
-                stats.form += ORANGE_EMOJI
-                if home_away_team == 'HOME':
-                    stats.home_form += ORANGE_EMOJI
+                    home_away_team = 'AWAY'
+                results = match.get('score')
+                result = results.get('winner')
+
+                if result is None:
+                    continue
+
+                if is_home:
+                    stats.goals_scored += results.get('fullTime').get('home')
+                    stats.goals_conceded += results.get('fullTime').get('away')
                 else:
-                    stats.away_form += ORANGE_EMOJI
-            else:
-                stats.loses += 1
-                stats.form += RED_EMOJI
-                if home_away_team == 'HOME':
-                    stats.home_form += RED_EMOJI
-                else:
-                    stats.away_form += RED_EMOJI
-            stats.save()
-            count += 1
-
-    # обновляет очки команды, победы, поражения, ничьи
-    # обновляет api-запросом
-    def team_points_full_update(self) -> None:
-        print(self.team_points_full_update.__name__)
-        teams = self.league_response.standing_response().get('table')
-
-        for team in teams:
-
-            name = team.get('team').get('shortName')
-            position = team.get('position')
-            points = team.get('points')
-            wins = team.get('won')
-            draws = team.get('draw')
-            loses = team.get('lost')
-
-            team_db = Team.objects.get(name=name)
-            team_db.position = position
-            team_db.points = points
-            team_db.total_wins = wins
-            team_db.total_draws = draws
-            team_db.total_loses = loses
-            team_db.save()
-
-
-class AfterMatchUpdate(AfterUpdate):
-    def __init__(
-            self,
-            league_name: str = str(),
-            matches_list: list = list()) -> None:
-        super().__init__(league_name)
-        self.matches_list = matches_list
-
-    def matches_full_update(self):
-        self.matches_score_update()
-        self.top_scorers_update()
-
-    # обновляет счет матчей
-    def matches_score_update(self) -> None:
-        print(self.matches_score_update.__name__)
-        matches = self.league_response.matchday_response().get('matches')
-        home_teams = [match.split(' - ')[0] for match in self.matches_list]
-
-        for f_match in matches:
-            home_team = f_match.get('homeTeam').get('shortName')
-            if home_team not in home_teams:
-                continue
-
-            status = f_match.get('status')
-
-            if status == 'TIMED' or status == 'IN_PLAY':
-                continue
-
-            fulltime = f_match.get('score').get('fullTime')
-            home_goals = fulltime.get('home')
-            away_goals = fulltime.get('away')
-            league_match = LeagueMatches.objects.get(
-                current_match__istartswith=home_team)
-
-            if status == 'POSTPONED':
-                league_match.fulltime = 'Перенесен'
-            elif status == 'FINISHED':
-                league_match.fulltime = f'{home_goals} - {away_goals}'
-            league_match.finished = True
-            league_match.save()
-
-    # обновляет список бомбардиров лиги
-    def top_scorers_update(self) -> None:
-        print(self.top_scorers_update.__name__)
-        Player.objects.filter(league=self.league.name).delete()
-
-        players = self.league_response.top_scorers_response().get('scorers')
-
-        for player in players:
-            name = player.get('player').get('name')
-            league = self.league.name
-            team = player.get('team').get('tla')
-            goals = player.get('goals')
-            penalty = player.get('penalties')
-            assists = player.get('assists')
-            matches = player.get('playedMatches')
-
-            if penalty is None:
-                penalty = 0
-            if assists is None:
-                assists = 0
-            if goals is None:
-                goals = 0
-            if matches is None:
-                matches = 0
-
-            Player.objects.create(
-                name=name,
-                league=league,
-                team=team,
-                goals=goals,
-                penalty=penalty,
-                assists=assists,
-                matches=matches
+                    stats.goals_scored += results.get('fullTime').get('away')
+                    stats.goals_conceded += results.get('fullTime').get('home')
+            except TypeError as error:
+                logger.error(
+                f'{error} in {self.team_stats_update.__name__}',
+                exc_info=True
             )
+            else:
+                if result.startswith(home_away_team):
+                    stats.wins += 1
+                    stats.form += GREEN_EMOJI
+                    if home_away_team == 'HOME':
+                        stats.home_form += GREEN_EMOJI
+                    else:
+                        stats.away_form += GREEN_EMOJI
+                elif result == 'DRAW':
+                    stats.draws += 1
+                    stats.form += ORANGE_EMOJI
+                    if home_away_team == 'HOME':
+                        stats.home_form += ORANGE_EMOJI
+                    else:
+                        stats.away_form += ORANGE_EMOJI
+                else:
+                    stats.loses += 1
+                    stats.form += RED_EMOJI
+                    if home_away_team == 'HOME':
+                        stats.home_form += RED_EMOJI
+                    else:
+                        stats.away_form += RED_EMOJI
+                stats.save()
+                count += 1
 
 
 class AfterSeasonUpdate(AfterUpdate):
     def league_teams_update(self):
-        print(self.league_teams_update.__name__)
         teams = LeagueResponse(league=self.league).league_teams_response()
         Team.objects.filter(league=self.league.name).delete()
 
         for team in teams:
-            name = team.get('shortName')
-            shortname = team.get('tla')
-            url_id = team.get('id')
-            league = self.league.name
+            try:
+                name = team.get('shortName')
+                shortname = team.get('tla')
+                url_id = team.get('id')
+            except TypeError as error:
+                logger.error(
+                    f'{error} in {self.league_teams_update.__name__}',
+                    exc_info=True
+                )
+            else:
+                league = self.league.name
 
-            Team.objects.create(
-                name=name,
-                shortname=shortname,
-                url_id=url_id,
-                league=league
-            )
+                Team.objects.create(
+                    name=name,
+                    shortname=shortname,
+                    url_id=url_id,
+                    league=league
+                )
 
 
 # Переводит дату из datetime в текст
@@ -289,7 +332,6 @@ def datetime_to_text(datetime_type) -> str:
 
 # Выдает статистику команды
 def get_team_stats(team_name: str) -> str:
-    print(get_team_stats.__name__)
     position = Team.objects.get(name=team_name).position
     stats = Statistics.objects.get(name=team_name)
     text = f'{team_name} ({position} место)\n'

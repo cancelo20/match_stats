@@ -6,22 +6,6 @@ from django.core.validators import (
 from django.db import models
 
 
-class User(models.Model):
-    username = models.CharField(
-        max_length=100,
-        verbose_name='Имя пользователя',
-        unique=True
-    )
-    time_zone = models.IntegerField(
-        verbose_name='Часовой пояс',
-        default=0,
-        validators=[
-            MinValueValidator(-12),
-            MaxValueValidator(12)
-        ]
-    )
-
-
 class League(models.Model):
     name = models.CharField(
         max_length=50,

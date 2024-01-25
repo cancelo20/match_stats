@@ -25,6 +25,7 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'football_stats.apps.FootballStatsConfig',
+    'user.apps.UserConfig',
 ]
 
 MIDDLEWARE = [
