@@ -299,6 +299,12 @@ class AfterSeasonUpdate(AfterUpdate):
 
         for team in teams:
             try:
+                fullname = team.get('name')
+                founded = team.get('founded')
+                stadium = team.get('venue')
+                address = team.get('address')
+                website = team.get('website')
+                coach = team.get('coach').get('name')
                 name = team.get('shortName')
                 shortname = team.get('tla')
                 url_id = team.get('id')
@@ -312,9 +318,15 @@ class AfterSeasonUpdate(AfterUpdate):
 
                 Team.objects.create(
                     name=name,
+                    fullname=fullname,
                     shortname=shortname,
                     url_id=url_id,
-                    league=league
+                    league=league,
+                    founded=founded,
+                    stadium=stadium,
+                    adress=address,
+                    website=website,
+                    coach=coach
                 )
 
 

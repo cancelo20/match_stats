@@ -80,21 +80,50 @@ class LeagueMatches(models.Model):
 
 
 class Team(models.Model):
+    fullname = models.CharField(
+        max_length=50,
+        verbose_name='Полное название команды',
+        blank=True
+    )
     name = models.CharField(
         max_length=50,
         verbose_name='Название команды'
-    )
-    url_id = models.IntegerField(
-        verbose_name='url_id',
-        unique=True
     )
     shortname = models.CharField(
         max_length=5,
         verbose_name='Аббревиатура команды'
     )
+    url_id = models.IntegerField(
+        verbose_name='url_id',
+        unique=True
+    )
     league = models.CharField(
         max_length=100,
         verbose_name='Лига',
+    )
+    founded = models.IntegerField(
+        verbose_name='Год создания',
+        null=True
+    )
+    stadium = models.CharField(
+        max_length=100,
+        verbose_name='Стадион команды',
+        blank=True,
+    )
+    adress = models.CharField(
+        max_length=100,
+        verbose_name='Адрес команды',
+        blank=True,
+    )
+    website = models.CharField(
+        max_length=100,
+        verbose_name='Сайт команды',
+        blank=True,
+    )
+    coach = models.CharField(
+        max_length=50,
+        verbose_name='Тренер',
+        blank=True,
     )
     position = models.IntegerField(
         verbose_name='Позиция в таблице',
@@ -108,7 +137,7 @@ class Team(models.Model):
         verbose_name='Общее кол-во побед',
         default=0,
         validators=[
-            MinValueValidator(1),
+            MinValueValidator(0),
             MaxValueValidator(50)
         ]
     )
@@ -116,7 +145,7 @@ class Team(models.Model):
         verbose_name='Общее кол-во поражений',
         default=0,
         validators=[
-            MinValueValidator(1),
+            MinValueValidator(0),
             MaxValueValidator(50)
         ]
     )
@@ -124,7 +153,7 @@ class Team(models.Model):
         verbose_name='Общее кол-во ничьих',
         default=0,
         validators=[
-            MinValueValidator(1),
+            MinValueValidator(0),
             MaxValueValidator(50)
         ]
     )
@@ -143,7 +172,7 @@ class Team(models.Model):
         verbose_name_plural = 'Команды'
 
     def __str__(self):
-        return self.name
+        return f'{self.name} - {self.league}'
 
 
 class Player(models.Model):

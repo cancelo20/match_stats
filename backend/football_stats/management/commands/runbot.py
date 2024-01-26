@@ -43,8 +43,8 @@ class Command(BaseCommand):
                         '(https://t.me/EPLStatsBot)\n' +
                         '_' * 54
                     )
-                    Thread(target=runlive, daemon=True).start()
-                    Thread(target=runupdates, daemon=True).start()
+                    #Thread(target=runlive, daemon=True).start()
+                    #Thread(target=runupdates, daemon=True).start()
                     bot.polling(non_stop=True)
                 except Exception as error:
                     print(error)
@@ -54,16 +54,19 @@ class Command(BaseCommand):
         input('Press <Enter> to exit.\n')
 
 
-# удаляет выбранное количество сообщений (по дефолту - 2)
-def del_last_msg(chat_id, message_id, number=2, timeout=0):
-    for i in range(number, 0, -1):
+# удаляет все сообщения
+def del_last_msg(chat_id, message_id):
+    count = 1
+    while True:
         try:
             bot.delete_message(
                 chat_id=chat_id,
-                message_id=message_id-i,
-                timeout=timeout)
+                message_id=message_id-count
+            )
         except Exception:
-            continue
+            break
+        else:
+            count += 1
 
 
 # Обработка команды /start
@@ -100,13 +103,8 @@ def clear(message) -> None:
     chat_id = message.chat.id
     message_id = message.message_id
 
-    try:
-        number = int(message.text.split(' ')[1])
-    except Exception:
-        number = 2
-    finally:
-        del_last_msg(chat_id, message_id, number)
-        bot.delete_message(chat_id=chat_id, message_id=message_id)
+    del_last_msg(chat_id, message_id)
+    bot.delete_message(chat_id=chat_id, message_id=message_id)
 
 
 # Обработка команд /timezone
@@ -453,21 +451,58 @@ def stats(callback) -> None:
         timezone = user.time_zone + 3
         date = datetime_to_text(f_match.date + td(hours=timezone))
         text += get_teams_probability(teams=teams_list, date=date)
+
+        bot.edit_message_text(
+            chat_id=callback.message.chat.id,
+            message_id=callback.message.id,
+            text=text,
+            reply_markup=button
+        )
     elif len(teams_list) == 1:
+        team_name = teams_list[0]
+        league_name = Team.objects.get(name=team_name).league
         text += get_team_stats(team_name=teams_list[0])
+        photo = f'football_stats/photos/{league_name}/{team_name}.jpg'
         button.add(
             telebot.types.InlineKeyboardButton(
                 text='<--------',
                 callback_data=f'teams&{callback.data.split('&')[1]}'
             )
         )
+        team = Team.objects.get(name=team_name)
+        if team.founded == -1:
+            founded = '-'
+        else:
+            founded = f'{team.founded} г.'
+        team_info = (
+            f'{team.fullname}\n\n' +
+            f'Дата создания: {founded}\n' +
+            f'Стадион: {team.stadium}\n' +
+            f'Адрес: {team.adress}\n' +
+            f'Вебсайт: {team.website}\n' +
+            f'Тренер: {team.coach}'
+        )
 
-    bot.edit_message_text(
-        chat_id=callback.message.chat.id,
-        message_id=callback.message.id,
-        text=text,
-        reply_markup=button
-    )
+        bot.edit_message_text(
+            chat_id=callback.message.chat.id,
+            message_id=callback.message.id,
+            text=team_info,
+            reply_markup=button
+        )
+
+        try:
+            with open(photo, 'rb') as file:
+                bot.edit_message_media(
+                    chat_id=callback.message.chat.id,
+                    message_id=callback.message.id+1,
+                    media=telebot.types.InputMediaPhoto(file, caption=text)
+                )
+        except:
+            bot.send_photo(
+                chat_id=callback.message.chat.id,
+                photo=open(photo, 'rb'),
+                caption=text
+            )
 
 
 # Оформление подписки на матч
@@ -552,3 +587,12 @@ def callback_inline(callback):
     else:
         if command != 'None':
             stats(callback)
+
+
+# обрабатывае все остальные сообщения
+@bot.message_handler(content_types=['text',])
+def all(message):
+    bot.send_message(
+        chat_id=message.chat.id,
+        text='Воспользуйтесь командой из меню.'
+    )

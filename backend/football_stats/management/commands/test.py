@@ -1,16 +1,18 @@
-from django.core.management import BaseCommand
-import telebot
 import os
-from time import sleep
+import requests
+
+from django.core.management import BaseCommand
+from football_stats.models import Team
 from dotenv import load_dotenv
-from user.models import User
-from threading import Thread
+from time import sleep
+
 
 load_dotenv()
 
 
-TG_TOKEN = str(os.getenv('TG_TOKEN'))
-bot = telebot.TeleBot(TG_TOKEN)
+HEADERS = {
+    'X-Auth-Token': f'{os.getenv("API_TOKEN")}'
+}
 
 
 class Command(BaseCommand):
@@ -20,14 +22,28 @@ class Command(BaseCommand):
     help = "test bot"
 
     def handle(self, *args, **options):
-        #def run():
-        while True:
-            user = User.objects.get(username='stepankrylovv')
-            bot.send_message(
-                chat_id=user.chat_id,
-                text='Hello!',
-            )
-            sleep(60)
+        teams = Team.objects.filter(league='Premier League')
 
-        #Thread(target=run, daemon=True).start()
-        #input('Press <Enter> to exit.\n')
+        for team in teams:
+            print(team.name)
+            url = f'{os.getenv('TEAMS_URL')}/{team.url_id}'
+            response = requests.get(url=url, headers=HEADERS).json()
+
+            fullname = response.get('name') if response.get('name') is not None else '-'
+            founded = response.get('founded') if response.get('founded') is not None else -1
+            stadium = response.get('venue') if response.get('venue') is not None else '-'
+            address = response.get('address') if not response.get('address').startswith('null') else '-'
+            website = response.get('website') if response.get('website') is not None else '-'
+            coach = response.get('coach').get('name') if response.get('coach').get('name') is not None else '-'
+
+
+            team.fullname = fullname
+            team.founded = founded
+            team.stadium = stadium
+            team.adress = address
+            team.website = website
+            team.coach = coach
+
+            team.save()
+
+            sleep(7)

@@ -1,5 +1,0 @@
-requests
-python-dotenv
-pyTelegramBotAPI
-pytz
-Django
